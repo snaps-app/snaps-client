@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:host {
+  --snaps-primary: #6366f1;
+  --snaps-primary-hover: #4f46e5;
+  --snaps-bg: #ffffff;
+  --snaps-bg-secondary: #f9fafb;
+  --snaps-text: #1f2937;
+  --snaps-text-secondary: #6b7280;
+  --snaps-border: #e5e7eb;
+  --snaps-success: #10b981;
+  --snaps-warning: #f59e0b;
+  --snaps-error: #ef4444;
+  --snaps-critical: #dc2626;
+  --snaps-font: 'Inter', system-ui, sans-serif;
+  --snaps-font-size-base: 14px;
+  --snaps-radius: 8px;
+  --snaps-spacing: 16px;
+
+  font-family: var(--snaps-font);
+  font-size: var(--snaps-font-size-base);
+  color: var(--snaps-text);
+}
