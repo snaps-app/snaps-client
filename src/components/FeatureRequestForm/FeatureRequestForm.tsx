@@ -36,15 +36,17 @@ export function FeatureRequestForm({
   // Validation State
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Required = Section 1 (Identificação) + the first 2 questions of Section 2
+  // (dor/oportunidade + solução proposta). Impacto, justificativa e anexos são opcionais.
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!title.trim()) newErrors.title = 'Título é obrigatório';
     if (title.length > 200) newErrors.title = 'Título deve ter no máximo 200 caracteres';
+    if (!application.trim()) newErrors.application = 'Aplicação é obrigatória';
+    if (!moduleName.trim()) newErrors.moduleName = 'Módulo / tela é obrigatório';
     if (!problemOrOpportunity.trim()) newErrors.problemOrOpportunity = 'Este campo é obrigatório';
     if (!proposedSolution.trim()) newErrors.proposedSolution = 'Este campo é obrigatório';
-    if (!expectedImpact.trim()) newErrors.expectedImpact = 'Este campo é obrigatório';
-    if (!priorityJustification.trim()) newErrors.priorityJustification = 'Este campo é obrigatório';
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -164,7 +166,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}`;
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600">Aplicação</label>
+              <label className="text-xs font-semibold text-slate-600">Aplicação *</label>
               <input
                 type="text"
                 value={application}
@@ -173,10 +175,11 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}`;
                 disabled={!!appName}
                 className="w-full px-3 py-2 text-sm border rounded bg-white focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-slate-100 disabled:text-slate-500"
               />
+              {errors.application && <p className="text-[11px] text-red-500">{errors.application}</p>}
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600">Módulo / Tela</label>
+              <label className="text-xs font-semibold text-slate-600">Módulo / Tela *</label>
               <input
                 type="text"
                 value={moduleName}
@@ -184,6 +187,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}`;
                 placeholder="Ex: Relatórios, Dashboard"
                 className="w-full px-3 py-2 text-sm border rounded bg-white focus:outline-none focus:ring-1 focus:ring-green-500"
               />
+              {errors.moduleName && <p className="text-[11px] text-red-500">{errors.moduleName}</p>}
             </div>
           </div>
         </div>
@@ -224,7 +228,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}`;
 
           <div className="space-y-1">
             <div className="flex justify-between items-baseline">
-              <label className="text-xs font-semibold text-slate-600">Que benefício isso traria? (Impacto esperado) *</label>
+              <label className="text-xs font-semibold text-slate-600">Que benefício isso traria? (Impacto esperado)</label>
               <span className="text-[10px] text-slate-400">{expectedImpact.length} caracteres</span>
             </div>
             <textarea
@@ -239,7 +243,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}`;
 
           <div className="space-y-1">
             <div className="flex justify-between items-baseline">
-              <label className="text-xs font-semibold text-slate-600">Por que isso é importante agora? (Justificativa) *</label>
+              <label className="text-xs font-semibold text-slate-600">Por que isso é importante agora? (Justificativa)</label>
               <span className="text-[10px] text-slate-400">{priorityJustification.length} caracteres</span>
             </div>
             <textarea

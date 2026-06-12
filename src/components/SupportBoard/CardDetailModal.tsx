@@ -13,12 +13,14 @@ export interface CardDetailModalProps {
   onRefresh: () => void;
 }
 
+// Mirrors the Snaps Support/QA board columns so status changes map to real
+// cockpit columns: new-issues → triaging → doing → testing → done.
 const STATUS_OPTIONS = [
-  { value: 'todo', label: 'A Fazer' },
-  { value: 'in_progress', label: 'Em Progresso' },
-  { value: 'assurance', label: 'Em Validação' },
+  { value: 'new-issues', label: 'Novo' },
+  { value: 'triaging', label: 'Triagem' },
+  { value: 'doing', label: 'Em Progresso' },
+  { value: 'testing', label: 'Em Teste' },
   { value: 'done', label: 'Concluído' },
-  { value: 'backlog', label: 'Backlog' },
 ];
 
 export function CardDetailModal({

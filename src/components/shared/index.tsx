@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bug, Lightbulb, UploadCloud, Paperclip, X } from 'lucide-react';
+import { Bug, Lightbulb, Wrench, Tag, Layers, UploadCloud, Paperclip, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -36,14 +36,23 @@ export interface StatusPillProps {
   status: string;
 }
 
+// Canonical Snaps board statuses (column ids), covering both the Support/QA and
+// Roadmap boards. Keep in sync with the board column ids used in the Snaps cockpit.
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
+  // Support / QA board: new-issues → triaging → doing → testing → done
   'new-issues': { label: 'Novo', className: 'bg-red-500 text-white' },
+  triaging: { label: 'Triagem', className: 'bg-amber-500 text-white' },
+  testing: { label: 'Em Teste', className: 'bg-purple-500 text-white' },
+  // Roadmap board: backlog → planning → todo → in_progress → assurance → done
+  backlog: { label: 'Backlog', className: 'bg-slate-400 text-white' },
+  planning: { label: 'Planejamento', className: 'bg-indigo-500 text-white' },
   todo: { label: 'A Fazer', className: 'bg-slate-500 text-white' },
+  assurance: { label: 'Em Validação', className: 'bg-yellow-500 text-black' },
+  // Shared / common ids
+  doing: { label: 'Em Progresso', className: 'bg-blue-500 text-white' },
   in_progress: { label: 'Em Progresso', className: 'bg-blue-500 text-white' },
   review: { label: 'Em Review', className: 'bg-purple-500 text-white' },
-  assurance: { label: 'Em Validação', className: 'bg-yellow-500 text-black' },
   done: { label: 'Concluído', className: 'bg-green-600 text-white' },
-  backlog: { label: 'Backlog', className: 'bg-slate-400 text-white' },
 };
 
 export function StatusPill({ status }: StatusPillProps) {
@@ -58,16 +67,44 @@ export function StatusPill({ status }: StatusPillProps) {
 // === TypeBadge ===
 export interface TypeBadgeProps {
   type: string;
+  /**
+   * 'support' frames `feature` cards as "Sugestão" (QA/Support nomenclature).
+   * Default ('roadmap') shows the literal card type (Feature, Tech Debt, …).
+   */
+  context?: 'roadmap' | 'support';
 }
 
-export function TypeBadge({ type }: TypeBadgeProps) {
-  const isBug = type === 'bug';
+const TYPE_CONFIG: Record<
+  string,
+  { label: string; className: string; Icon: React.ComponentType<{ className?: string }> }
+> = {
+  bug: { label: 'Bug', className: 'bg-red-50 text-red-600', Icon: Bug },
+  feature: { label: 'Feature', className: 'bg-green-50 text-green-600', Icon: Lightbulb },
+  'tech-debt': { label: 'Tech Debt', className: 'bg-amber-50 text-amber-700', Icon: Wrench },
+  refactor: { label: 'Refactor', className: 'bg-indigo-50 text-indigo-600', Icon: Wrench },
+  chore: { label: 'Chore', className: 'bg-slate-100 text-slate-600', Icon: Tag },
+  support: { label: 'Suporte', className: 'bg-teal-50 text-teal-600', Icon: Tag },
+  sprint_macro: { label: 'Macro', className: 'bg-purple-50 text-purple-600', Icon: Layers },
+};
+
+export function TypeBadge({ type, context = 'roadmap' }: TypeBadgeProps) {
+  const key = (type || '').toLowerCase();
+  if (!key) return null;
+
+  const cfg = TYPE_CONFIG[key] || {
+    label: type.charAt(0).toUpperCase() + type.slice(1),
+    className: 'bg-slate-100 text-slate-600',
+    Icon: Tag,
+  };
+
+  // "Sugestão" is only nomenclature inside QA/Support — elsewhere show the real type.
+  const label = context === 'support' && key === 'feature' ? 'Sugestão' : cfg.label;
+  const Icon = cfg.Icon;
+
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${
-      isBug ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
-    }`}>
-      {isBug ? <Bug className="w-3.5 h-3.5" /> : <Lightbulb className="w-3.5 h-3.5" />}
-      {isBug ? 'Bug' : 'Sugestão'}
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold ${cfg.className}`}>
+      <Icon className="w-3.5 h-3.5" />
+      {label}
     </span>
   );
 }

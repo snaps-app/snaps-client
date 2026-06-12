@@ -23,7 +23,7 @@ export function MiniCard({ card }: MiniCardProps) {
       </div>
 
       <div className="flex items-center justify-between gap-1 flex-wrap">
-        <TypeBadge type={card.card_type || 'bug'} />
+        <TypeBadge type={card.card_type || ''} />
         <StatusPill status={card.status} />
       </div>
     </div>

@@ -62,15 +62,17 @@ export function BugReportForm({
     }
   };
 
+  // Required = Section 1 (Identificação) + Section 2 (Comportamento e Reprodução).
+  // Everything else (classificação, workaround, evidências, info técnica) is optional.
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!title.trim()) newErrors.title = 'Título é obrigatório';
     if (title.length > 200) newErrors.title = 'Título deve ter no máximo 200 caracteres';
+    if (!application.trim()) newErrors.application = 'Aplicação é obrigatória';
+    if (!moduleName.trim()) newErrors.moduleName = 'Módulo / tela é obrigatório';
     if (!actualBehavior.trim()) newErrors.actualBehavior = 'Comportamento atual é obrigatório';
     if (!expectedBehavior.trim()) newErrors.expectedBehavior = 'Comportamento esperado é obrigatório';
-    if (hasWorkaround && !workaroundDescription.trim()) {
-      newErrors.workaroundDescription = 'Descrição do contorno é obrigatória se houver workaround';
-    }
+    if (!stepsToReproduce.trim()) newErrors.stepsToReproduce = 'Passos para reproduzir são obrigatórios';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -209,7 +211,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600">Aplicação</label>
+              <label className="text-xs font-semibold text-slate-600">Aplicação *</label>
               <input
                 type="text"
                 value={application}
@@ -218,10 +220,11 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}
                 disabled={!!appName}
                 className="w-full px-3 py-2 text-sm border rounded bg-white focus:outline-none focus:ring-1 focus:ring-red-500 disabled:bg-slate-100 disabled:text-slate-500"
               />
+              {errors.application && <p className="text-[11px] text-red-500">{errors.application}</p>}
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600">Módulo / Tela</label>
+              <label className="text-xs font-semibold text-slate-600">Módulo / Tela *</label>
               <input
                 type="text"
                 value={moduleName}
@@ -229,6 +232,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}
                 placeholder="Ex: Checkout, Login, Perfil"
                 className="w-full px-3 py-2 text-sm border rounded bg-white focus:outline-none focus:ring-1 focus:ring-red-500"
               />
+              {errors.moduleName && <p className="text-[11px] text-red-500">{errors.moduleName}</p>}
             </div>
           </div>
         </div>
@@ -262,7 +266,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-600">Passos para reproduzir</label>
+            <label className="text-xs font-semibold text-slate-600">Passos para reproduzir *</label>
             <textarea
               value={stepsToReproduce}
               onChange={e => setStepsToReproduce(e.target.value)}
@@ -270,6 +274,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}
               rows={4}
               className="w-full px-3 py-2 text-sm border rounded bg-white focus:outline-none focus:ring-1 focus:ring-red-500 font-mono text-xs"
             />
+            {errors.stepsToReproduce && <p className="text-[11px] text-red-500">{errors.stepsToReproduce}</p>}
           </div>
         </div>
 
@@ -374,7 +379,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}
 
             {hasWorkaround && (
               <div className="space-y-1 animate-fadeIn">
-                <label className="text-xs font-semibold text-slate-600">Como contornar o problema? *</label>
+                <label className="text-xs font-semibold text-slate-600">Como contornar o problema?</label>
                 <textarea
                   value={workaroundDescription}
                   onChange={e => setWorkaroundDescription(e.target.value)}

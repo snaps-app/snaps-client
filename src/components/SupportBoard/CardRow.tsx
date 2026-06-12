@@ -39,7 +39,7 @@ export function CardRow({ card, onClick }: CardRowProps) {
     >
       <div className="flex items-center gap-3 min-w-0 mr-4">
         <div className="shrink-0">
-          <TypeBadge type={card.card_type || 'bug'} />
+          <TypeBadge type={card.card_type || 'bug'} context="support" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
