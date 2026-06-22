@@ -130,7 +130,7 @@ export function GovernanceDocs({
 
   // Render list view
   return (
-    <div className="space-y-6 max-w-4xl w-full mx-auto animate-fadeIn">
+    <div className="space-y-6 w-full mx-auto animate-fadeIn">
       {/* Search and refresh header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border shadow-sm">
         <div className="flex-1 max-w-md">

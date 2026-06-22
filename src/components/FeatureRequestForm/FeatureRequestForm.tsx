@@ -105,6 +105,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}`;
       const payload = {
         title,
         card_type: 'feature',
+        status: 'New Issues',
         priority: 'Medium', // default to Medium
         description,
         labels: [application, moduleName].filter(Boolean),
@@ -141,7 +142,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}`;
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border p-6 max-w-2xl w-full">
+    <div className="bg-white rounded-xl shadow-sm border p-6 w-full">
       <ToastContainer />
       <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
         <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />

@@ -81,7 +81,7 @@ export function RoadmapBoard({
   }
 
   return (
-    <div className="space-y-4 max-w-4xl w-full mx-auto">
+    <div className="space-y-4 w-full mx-auto">
       {/* Sprints list */}
       {sprints.map(sprint => (
         <SprintSection

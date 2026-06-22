@@ -125,6 +125,7 @@ export class SnapsPublicClient {
     card_type?: string;
     priority?: string;
     labels?: string[];
+    status?: string;
     card_metadata?: any;
   }): Promise<SnapsCard> {
     const url = `${this.apiUrl}/public/projects/${this.projectId}/cards`;
