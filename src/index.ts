@@ -12,4 +12,5 @@ export * from './components/RoadmapBoard';
 export * from './components/BugReportForm';
 export * from './components/FeatureRequestForm';
 export * from './components/GovernanceDocs';
+export * from './components/CostsBoard';
 export * from './components/shared';

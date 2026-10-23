@@ -1,5 +1,7 @@
 import { AttachmentResponse, readSupportEvents, SupportEvent, SupportMessage, SupportSession } from './support-chat';
+import { CostPeriod, HoursOptions, HoursResponse, LlmCostsResponse } from './costs';
 export * from './support-chat';
+export * from './costs';
 
 export interface SnapsPublicClientConfig {
   projectId: string;
@@ -115,6 +117,23 @@ export class SnapsPublicClient {
     const res = await fetch(`${this.apiUrl}/public/projects/${this.projectId}/support/cards/${encodeURIComponent(cardId)}`, { method: 'PATCH', headers: this.getHeaders(), body: JSON.stringify(payload) });
     if (!res.ok) throw new SnapsHttpError(res.status);
     return res.json();
+  }
+
+  private async costsRequest(path: string, period: CostPeriod, extra: Record<string, string | number | undefined>, signal?: AbortSignal) {
+    const query = new URLSearchParams({ start_date: period.startDate, end_date: period.endDate });
+    Object.entries(extra).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
+    const res = await fetch(`${this.apiUrl}/public/projects/${this.projectId}/costs/${path}?${query}`, { headers: this.getHeaders(), signal });
+    if (!res.ok) throw new SnapsHttpError(res.status);
+    return res;
+  }
+  async fetchHours(options: HoursOptions, signal?: AbortSignal): Promise<HoursResponse> { return (await this.costsRequest('hours', options, { person_id: options.personId, limit: options.limit ?? 100, offset: options.offset ?? 0 }, signal)).json(); }
+  async fetchLlmCosts(options: CostPeriod & { conversationId?: string }, signal?: AbortSignal): Promise<LlmCostsResponse> { return (await this.costsRequest('llm', options, { conversation_id: options.conversationId }, signal)).json(); }
+  async fetchCostsReport(options: CostPeriod & { personId?: string }, signal?: AbortSignal): Promise<Blob> {
+    const res = await this.costsRequest('report', options, { person_id: options.personId }, signal);
+    if (res.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/pdf') throw new Error('Relatório PDF indisponível. Tente novamente.');
+    const bytes = await res.arrayBuffer();
+    if (new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error('Relatório PDF inválido. Tente novamente.');
+    return new Blob([bytes], { type: 'application/pdf' });
   }
 
   private async supportRequest(path: string, payload: unknown, session?: SupportSession, signal?: AbortSignal, keepalive = false) {

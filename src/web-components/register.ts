@@ -4,6 +4,7 @@ import { RoadmapBoard } from '../components/RoadmapBoard';
 import { BugReportForm } from '../components/BugReportForm';
 import { FeatureRequestForm } from '../components/FeatureRequestForm';
 import { GovernanceDocs } from '../components/GovernanceDocs';
+import { CostsBoard } from '../components/CostsBoard';
 import { withShadowStyles } from './withShadowStyles';
 
 // Each component is wrapped with withShadowStyles so the compiled Tailwind CSS is
@@ -62,8 +63,11 @@ const wcGovernanceDocs = r2wc(withShadowStyles(GovernanceDocs), {
   },
 });
 
+const wcCostsBoard = r2wc(withShadowStyles(CostsBoard), { shadow: 'open', props: { projectId: 'string', apiKey: 'string', apiUrl: 'string' } });
+
 export function registerAll() {
   if (typeof window !== 'undefined' && window.customElements) {
+    if (!window.customElements.get('snaps-costs-board')) window.customElements.define('snaps-costs-board', wcCostsBoard);
     if (!window.customElements.get('snaps-support-board')) {
       window.customElements.define('snaps-support-board', wcSupportBoard);
     }
