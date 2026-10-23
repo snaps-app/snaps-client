@@ -1,59 +1,41 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { PublicDocDetail } from '../../api/snaps-client';
 import { DocTypeBadge } from './DocTypeBadge';
-import { MarkdownRenderer } from '../shared';
-import { ArrowLeft, Calendar } from 'lucide-react';
-import { formatRelativeTime } from '../SupportBoard/CardRow';
+import { downloadMarkdown, printDocument } from './export';
 
-export interface DocViewerProps {
-  doc: {
-    id: string;
-    name: string;
-    type: string;
-    content: string;
-    updated_at: string;
-  };
-  onBack: () => void;
-}
-
+export interface DocViewerProps { doc: PublicDocDetail; onBack: () => void; }
 export function DocViewer({ doc, onBack }: DocViewerProps) {
-  return (
-    <div className="bg-white rounded-xl border shadow-sm p-6 space-y-6">
-      {/* Breadcrumb & Navigation */}
-      <div className="flex flex-col gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors w-max"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Voltar para Lista
-        </button>
-
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <span>Documentação</span>
-          <span>&gt;</span>
-          <span className="text-slate-600 font-medium">{doc.name}</span>
-        </div>
-      </div>
-
-      {/* Doc Title & Info */}
-      <div className="border-b pb-4 space-y-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <DocTypeBadge type={doc.type} />
-          <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
-            <Calendar className="w-3.5 h-3.5" />
-            Atualizado {formatRelativeTime(doc.updated_at)}
-          </span>
-        </div>
-        <h2 className="text-xl md:text-2xl font-bold text-slate-800 leading-tight">
-          {doc.name}
-        </h2>
-      </div>
-
-      {/* Content Renderer */}
-      <div className="bg-slate-50/50 border rounded-lg p-5">
-        <MarkdownRenderer content={doc.content} />
-      </div>
+  const [focused, setFocused] = useState(false); const [error, setError] = useState('');
+  const expand = useRef<HTMLButtonElement>(null); const dialog = useRef<HTMLDivElement>(null);
+  const close = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!focused) return;
+    close.current?.focus();
+    return () => { expand.current?.focus(); };
+  }, [focused]);
+  const trap = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') { e.stopPropagation(); setFocused(false); }
+    if (focused && e.key === 'Tab') {
+      const nodes = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button, a[href], input, textarea, select, [tabindex="0"]') || []).filter(x => !x.hasAttribute('disabled'));
+      const root = dialog.current?.getRootNode() as Document | ShadowRoot;
+      const index = nodes.indexOf(root.activeElement as HTMLElement);
+      if ((e.shiftKey && index <= 0) || (!e.shiftKey && (index === nodes.length - 1 || index === -1))) { e.preventDefault(); nodes[e.shiftKey ? nodes.length - 1 : 0]?.focus(); }
+    }
+  };
+  return <div ref={dialog} role={focused ? 'dialog' : undefined} aria-modal={focused || undefined} aria-label={focused ? doc.name : undefined}
+    onKeyDown={trap} className={focused ? 'snaps-doc-focus' : 'w-full min-h-full bg-white rounded-xl border p-6 space-y-6'}>
+    <div className="flex flex-wrap items-center gap-2">
+      {!focused && <button type="button" className="snaps-button" onClick={onBack}>Voltar para Lista</button>}
+      <button ref={expand} type="button" className="snaps-button" onClick={() => setFocused(true)} hidden={focused}>Ampliar</button>
+      {focused && <button ref={close} type="button" className="snaps-button" onClick={() => setFocused(false)}>Fechar foco</button>}
+      <button type="button" className="snaps-button" onClick={() => downloadMarkdown(doc)}>Baixar MD</button>
+      <button type="button" className="snaps-button" onClick={() => { setError(''); void printDocument(doc).catch(() => setError('Não foi possível abrir a impressão. Permita a janela e tente novamente.')); }}>Imprimir / PDF</button>
     </div>
-  );
+    {error && <p role="alert">{error}</p>}
+    <header className="border-b py-4"><DocTypeBadge type={doc.type} /><h2 className="text-2xl font-bold mt-2">{doc.name}</h2></header>
+    <article className="prose max-w-none w-full"><ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml>{doc.content}</ReactMarkdown></article>
+  </div>;
 }
+

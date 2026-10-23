@@ -28,3 +28,5 @@
 .snaps-button:hover, .snaps-button[aria-pressed="true"] { background: var(--snaps-primary); color: white; }
 .snaps-button:disabled { opacity: .5; cursor: default; }
 :focus-visible { outline: 2px solid var(--snaps-primary); outline-offset: 3px; }
+.snaps-doc-focus { position: fixed; inset: 0; z-index: 1000; overflow-y: auto; background: var(--snaps-bg); color: var(--snaps-text); padding: 24px; }
+.snaps-doc-focus article { margin-top: 24px; }
