@@ -31,7 +31,7 @@ export function DocViewer({ doc, onBack }: DocViewerProps) {
       <button ref={expand} type="button" className="snaps-button" onClick={() => setFocused(true)} hidden={focused}>Ampliar</button>
       {focused && <button ref={close} type="button" className="snaps-button" onClick={() => setFocused(false)}>Fechar foco</button>}
       <button type="button" className="snaps-button" onClick={() => downloadMarkdown(doc)}>Baixar MD</button>
-      <button type="button" className="snaps-button" onClick={() => { setError(''); void printDocument(doc).catch(() => setError('Não foi possível abrir a impressão. Permita a janela e tente novamente.')); }}>Imprimir / PDF</button>
+      <button type="button" className="snaps-button" onClick={() => { setError(''); void printDocument(doc).catch(() => setError('Não foi possível preparar a impressão completa. Verifique as imagens, permita a janela e tente novamente.')); }}>Imprimir / PDF</button>
     </div>
     {error && <p role="alert">{error}</p>}
     <header className="border-b py-4"><DocTypeBadge type={doc.type} /><h2 className="text-2xl font-bold mt-2">{doc.name}</h2></header>

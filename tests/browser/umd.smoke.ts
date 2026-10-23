@@ -3,10 +3,20 @@ import { chromium, type Browser } from '@playwright/test';
 import { createServer, type Server } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { deflateSync } from 'node:zlib';
 
 let browser: Browser; let server: Server; let origin: string;
 let markdown = '# Documento extenso\n\n<script>window.evil=1</script>\n\n' + Array.from({ length: 45 }, (_, i) => '## Seção ' + (i + 1) + '\n\n' + 'Conteúdo original com ação, acentos e detalhes de suporte. '.repeat(30) + '\n\n| Campo | Valor |\n| --- | --- |\n| Teste | Evidência |\n\n').join('');
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jGZkAAAAASUVORK5CYII=', 'base64');
+function pngChunk(kind: string, data: Buffer) {
+  const name = Buffer.from(kind); const size = Buffer.alloc(4); size.writeUInt32BE(data.length);
+  let crc = 0xffffffff;
+  for (const byte of Buffer.concat([name, data])) { crc ^= byte; for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0); }
+  const checksum = Buffer.alloc(4); checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
+  return Buffer.concat([size, name, data, checksum]);
+}
+const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(1, 0); ihdr.writeUInt32BE(1, 4); ihdr[8] = 8; ihdr[9] = 6;
+const png = Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), pngChunk('IHDR', ihdr), pngChunk('IDAT', deflateSync(Buffer.from([0, 255, 255, 255, 255]))), pngChunk('IEND', Buffer.alloc(0))]);
+const imageUrl = 'https://evidence.example.test/image.png';
 const card = { id: 'card', title: 'Bug de teste', description: 'Descrição preservada', status: 'new-issues', card_type: 'bug', created_at: '2026-10-23', card_metadata: {} };
 beforeAll(async () => {
   server = createServer((req, res) => {
@@ -17,7 +27,7 @@ beforeAll(async () => {
   });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   origin = 'http://127.0.0.1:' + (server.address() as { port: number }).port;
-  markdown += '\n\n![Evidência](' + origin + '/image.png)\n\n[Ajuda](https://example.test/support)\n';
+  markdown += '\n\n![Evidência](' + imageUrl + ')\n\n[Ajuda](https://example.test/support)\n';
   browser = await chromium.launch({ headless: true, ...(process.platform === 'win32' ? { channel: 'msedge' } : {}) });
 });
 afterAll(async () => { await browser?.close(); if (server) await new Promise<void>(resolve => server.close(() => resolve())); });
@@ -25,6 +35,7 @@ async function host() {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addInitScript(() => { window.print = () => { (window as unknown as { printCalled: boolean }).printCalled = true; }; });
   const page = await context.newPage(); const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+  await context.route(imageUrl, route => route.fulfill({ contentType: 'image/png', body: png }));
   const requests: string[] = [];
   const sentMessages: Record<string, unknown>[] = [];
   await context.route('**/public/projects/**', async route => {
@@ -41,7 +52,7 @@ async function host() {
     else if (path.endsWith('/support/chats')) json = { chat_id: 'chat', session_token: 'fixture-session', expires_at: '2030-01-01' };
     else if (path.endsWith('/support/upload')) {
       if (requests.filter(p => p.endsWith('/support/upload')).length === 1) { await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); return; }
-      json = { attachment_id: 'image-1', url: origin + '/image.png', mime_type: 'image/png', size_bytes: 68 };
+      json = { attachment_id: 'image-1', url: imageUrl, mime_type: 'image/png', size_bytes: png.length };
     }
     else if (path.endsWith('/messages')) {
       sentMessages.push(req.postDataJSON());
@@ -62,7 +73,7 @@ it('loads standalone UMD, versions six Shadow DOM hosts and confirms an ephemera
     expect(await page.evaluate(() => [...document.querySelectorAll('[data-snaps-version]')].every(h => Boolean(h.shadowRoot?.querySelector('style')?.textContent?.includes('--snaps-primary'))))).toBe(true);
     expect(await page.locator('snaps-costs-board').getByRole('button', { name: 'Aplicar período' }).evaluate(el => getComputedStyle(el).fontSize)).not.toBe('40px');
     const support = page.locator('snaps-support-board'); await support.getByRole('button', { name: 'Conversar com o suporte' }).click();
-    await support.getByLabel('Anexar imagens', { exact: true }).setInputFiles({ name: 'evidence.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jGZkAAAAASUVORK5CYII=', 'base64') });
+    await support.getByLabel('Anexar imagens', { exact: true }).setInputFiles({ name: 'evidence.png', mimeType: 'image/png', buffer: png });
     await support.getByRole('button', { name: 'Tentar upload novamente' }).click();
     await support.getByText('evidence.png Pronta', { exact: true }).waitFor();
     await support.getByLabel('Mensagem', { exact: true }).fill('Relato desta sessão'); await support.getByRole('button', { name: 'Enviar', exact: true }).click();
@@ -89,7 +100,8 @@ it('downloads exact Markdown and creates an isolated real multipage A4 PDF', asy
     const stream = await download.createReadStream(); const chunks: Buffer[] = []; for await (const chunk of stream!) chunks.push(Buffer.from(chunk)); expect(Buffer.concat(chunks).toString('utf8')).toBe(markdown);
     const popupPromise = page.waitForEvent('popup'); await docs.getByRole('button', { name: 'Imprimir / PDF' }).click(); const popup = await popupPromise;
     await popup.locator('article').waitFor(); expect(await popup.evaluate(() => window.opener)).toBeNull(); expect(await popup.locator('script').count()).toBe(0);
-    await popup.waitForFunction(() => (window as unknown as { printCalled?: boolean }).printCalled === true);
+    await popup.waitForFunction(() => (window as unknown as { printCalled?: boolean }).printCalled === true, undefined, { timeout: 15000 });
+    expect(await popup.locator('img').evaluate(img => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     expect(await popup.evaluate(() => (window as unknown as { evil?: boolean }).evil)).toBeUndefined();
     const pdf = await popup.pdf({ preferCSSPageSize: true, printBackground: true });
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-'); const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length; expect(pages).toBeGreaterThan(1);
