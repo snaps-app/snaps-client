@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 
 // The provisioner can return an 8.3 Windows path; Vite resolves imports by realpath.
 const root = realpathSync.native(process.cwd());
+process.chdir(root);
 
 export default defineConfig({
   root,

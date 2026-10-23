@@ -55,7 +55,18 @@ export interface PublicRoadmapResponse {
   project_id: string;
   sprints: SnapsSprint[];
   backlog: SnapsCard[];
+  total?: number;
+  limit?: number;
+  offset?: number;
+  has_more?: boolean;
+  backlog_total?: number;
+  backlog_limit?: number;
+  backlog_offset?: number;
+  backlog_has_more?: boolean;
 }
+
+export type SprintStatus = 'planning' | 'active' | 'done' | 'cancelled';
+export interface RoadmapOptions { limit?: number; offset?: number; sprintStatus?: SprintStatus[]; backlogLimit?: number; backlogOffset?: number; }
 
 export interface PublicDocSummary {
   id: string;
@@ -164,9 +175,16 @@ export class SnapsPublicClient {
     }
   }
 
-  async fetchRoadmapSprints(): Promise<PublicRoadmapResponse> {
-    const url = `${this.apiUrl}/public/projects/${this.projectId}/roadmap`;
-    const res = await fetch(url, { headers: this.getHeaders() });
+  async fetchRoadmapSprints(options?: RoadmapOptions, signal?: AbortSignal): Promise<PublicRoadmapResponse> {
+    const params = new URLSearchParams();
+    if (options) {
+      for (const [key, value] of Object.entries({ limit: options.limit, offset: options.offset, backlog_limit: options.backlogLimit, backlog_offset: options.backlogOffset })) {
+        if (value !== undefined) params.set(key, String(value));
+      }
+      options.sprintStatus?.forEach(status => params.append('sprint_status', status));
+    }
+    const url = `${this.apiUrl}/public/projects/${this.projectId}/roadmap${params.size ? `?${params}` : ''}`;
+    const res = await fetch(url, { headers: this.getHeaders(), signal });
     if (!res.ok) {
       throw new Error(`SnapsPublicClient.fetchRoadmapSprints: HTTP ${res.status}`);
     }
