@@ -7,6 +7,7 @@
     "strict": true,
     "moduleResolution": "bundler",
     "declaration": true,
+    "emitDeclarationOnly": true,
     "declarationDir": "dist",
     "outDir": "dist",
     "esModuleInterop": true,

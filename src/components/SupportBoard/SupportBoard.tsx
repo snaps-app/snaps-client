@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SnapsCard, SnapsPublicClient, SupportListResponse } from '../../api/snaps-client';
 import { CardRow } from './CardRow';
 import { CardDetailModal } from './CardDetailModal';
@@ -18,7 +18,10 @@ export interface SupportBoardProps {
   appName?: string;
 }
 
-export function SupportBoard({
+export function SupportBoard(props: SupportBoardProps) {
+  return <SupportView key={JSON.stringify([props.projectId, props.apiKey, props.apiUrl, props.sessionUserRef, props.sessionKey])} {...props} />;
+}
+function SupportView({
   projectId,
   apiKey,
   apiUrl,
@@ -30,6 +33,7 @@ export function SupportBoard({
 }: SupportBoardProps) {
   const [activeTab, setActiveTab] = useState<'active' | 'history'>(defaultTab);
   const [chatOpen, setChatOpen] = useState(false);
+  const requestGeneration = useRef(0);
 
   // Pagination States
   const [activeData, setActiveData] = useState<SupportListResponse | null>(null);
@@ -58,6 +62,7 @@ export function SupportBoard({
 
   // 1. Fetch function
   const fetchTickets = async (tab: 'active' | 'history') => {
+    const generation = ++requestGeneration.current;
     setIsLoading(true);
     setError(null);
     try {
@@ -68,19 +73,19 @@ export function SupportBoard({
           activePage * pageSize,
           'done' // exclude done
         );
-        setActiveData(data);
+        if (generation === requestGeneration.current) setActiveData(data);
       } else {
         const data = await client.fetchSupportCards(
           'done',
           pageSize,
           historyPage * pageSize
         );
-        setHistoryData(data);
+        if (generation === requestGeneration.current) setHistoryData(data);
       }
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar chamados.');
+      if (generation === requestGeneration.current) setError('Não foi possível carregar os chamados. Tente novamente.');
     } finally {
-      setIsLoading(false);
+      if (generation === requestGeneration.current) setIsLoading(false);
     }
   };
 

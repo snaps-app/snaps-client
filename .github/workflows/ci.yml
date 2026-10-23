@@ -17,3 +17,12 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          SNAPS_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - run: npx playwright install --with-deps chromium
+      - run: npm test -- --config vitest.browser.config.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snaps-client-0.2.0-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error

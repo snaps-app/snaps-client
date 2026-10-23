@@ -1,6 +1,6 @@
 {
   "name": "@snaps/client",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "main": "dist/snaps-client.umd.js",
   "module": "dist/snaps-client.es.js",
@@ -11,7 +11,7 @@
   "scripts": {
     "test": "vitest run",
     "dev": "vite build --watch",
-    "build": "vite build && tsc",
+    "build": "vite build && tsc && node scripts/build-manifest.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

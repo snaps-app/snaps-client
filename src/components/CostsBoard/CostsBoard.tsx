@@ -17,7 +17,7 @@ function CostsView({ projectId, apiKey, apiUrl }: CostsBoardProps) {
   };
   return <div className="snaps-costs space-y-6">
     <header><h2 className="text-2xl font-bold">Custos do projeto</h2><p>Horas confirmadas e IA do suporte no período selecionado.</p></header>
-    <form className="flex flex-wrap gap-3 items-end" onSubmit={e => { e.preventDefault(); if (!validPeriod(draft)) { setError('Selecione um período de 1 a 366 dias, com início até o fim.'); return; } setError(''); setPeriod({ ...draft }); setPersonId(''); setPeople([]); }}>
+    <form className="flex flex-wrap gap-3 items-end" onSubmit={e => { e.preventDefault(); if (!validPeriod(draft)) { setError('Selecione um período de 1 a 366 dias, com início até o fim.'); return; } setError(''); if (period.startDate !== draft.startDate || period.endDate !== draft.endDate) setPeople([]); setPeriod({ ...draft }); setPersonId(''); }}>
       <label>Início<input type="date" aria-label="Início" value={draft.startDate} onChange={e => setDraft(d => ({ ...d, startDate: e.target.value }))} /></label>
       <label>Fim<input type="date" aria-label="Fim" value={draft.endDate} onChange={e => setDraft(d => ({ ...d, endDate: e.target.value }))} /></label>
       <button type="submit" className="snaps-button">Aplicar período</button>
@@ -45,7 +45,10 @@ function HoursPanel({ client, period, personId, onPeople }: { client: SnapsPubli
       <p>Total de horas: {data.total_hours}</p>{!data.series.length ? <p>Sem horas confirmadas neste período.</p> : <>
         <svg role="img" aria-label="Horas por dia e pessoa; valores na tabela abaixo" viewBox="0 0 700 160" className="w-full"><title>Horas por dia e pessoa</title>{data.people.map((p, i) => {
           const values = data.series.filter(s => s.person_id === p.id); const dates = [...new Set(data.series.map(s => s.date))].sort(); const max = Math.max(1, ...data.series.map(s => Number(s.hours)));
-          return <polyline key={p.id} fill="none" stroke={['var(--snaps-primary)', 'var(--snaps-success)', 'var(--snaps-warning)', 'var(--snaps-error)'][i % 4]} strokeWidth="3" points={values.map(v => `${20 + dates.indexOf(v.date) * 650 / Math.max(1, dates.length - 1)},${140 - Number(v.hours) / max * 120}`).join(' ')}><title>{p.display_name} ({p.id})</title></polyline>;
+          const color = ['var(--snaps-primary)', 'var(--snaps-success)', 'var(--snaps-warning)', 'var(--snaps-error)'][i % 4];
+          const x = (date: string) => 20 + dates.indexOf(date) * 650 / Math.max(1, dates.length - 1);
+          const y = (hours: string | number) => 140 - Number(hours) / max * 120;
+          return <g key={p.id}><polyline fill="none" stroke={color} strokeWidth="3" points={values.map(v => `${x(v.date)},${y(v.hours)}`).join(' ')} /><title>{p.display_name} ({p.id})</title>{values.map(v => <circle key={v.date} cx={x(v.date)} cy={y(v.hours)} r="4" fill={color}><title>{v.date}: {p.display_name}, {v.hours} horas</title></circle>)}</g>;
         })}</svg>
         <div className="overflow-x-auto"><table><caption>Horas diárias por pessoa</caption><thead><tr><th>Data</th><th>Pessoa</th><th>Horas</th></tr></thead><tbody>{data.series.map(p => <tr key={`${p.date}/${p.person_id}`}><td>{p.date}</td><td>{names.get(p.person_id)} ({p.person_id})</td><td>{p.hours}</td></tr>)}</tbody></table></div>
       </>}

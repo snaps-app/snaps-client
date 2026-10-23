@@ -6,6 +6,16 @@ import { FeatureRequestForm } from '../components/FeatureRequestForm';
 import { GovernanceDocs } from '../components/GovernanceDocs';
 import { CostsBoard } from '../components/CostsBoard';
 import { withShadowStyles } from './withShadowStyles';
+import { version } from '../version';
+
+function versioned(Component: CustomElementConstructor): CustomElementConstructor {
+  return class extends Component {
+    connectedCallback() {
+      this.setAttribute('data-snaps-version', version);
+      (Component.prototype as HTMLElement & { connectedCallback?: () => void }).connectedCallback?.call(this);
+    }
+  };
+}
 
 // Each component is wrapped with withShadowStyles so the compiled Tailwind CSS is
 // injected into its Shadow DOM (shadow: 'open' otherwise isolates it unstyled).
@@ -67,21 +77,21 @@ const wcCostsBoard = r2wc(withShadowStyles(CostsBoard), { shadow: 'open', props:
 
 export function registerAll() {
   if (typeof window !== 'undefined' && window.customElements) {
-    if (!window.customElements.get('snaps-costs-board')) window.customElements.define('snaps-costs-board', wcCostsBoard);
+    if (!window.customElements.get('snaps-costs-board')) window.customElements.define('snaps-costs-board', versioned(wcCostsBoard));
     if (!window.customElements.get('snaps-support-board')) {
-      window.customElements.define('snaps-support-board', wcSupportBoard);
+      window.customElements.define('snaps-support-board', versioned(wcSupportBoard));
     }
     if (!window.customElements.get('snaps-roadmap-board')) {
-      window.customElements.define('snaps-roadmap-board', wcRoadmapBoard);
+      window.customElements.define('snaps-roadmap-board', versioned(wcRoadmapBoard));
     }
     if (!window.customElements.get('snaps-bug-report-form')) {
-      window.customElements.define('snaps-bug-report-form', wcBugReportForm);
+      window.customElements.define('snaps-bug-report-form', versioned(wcBugReportForm));
     }
     if (!window.customElements.get('snaps-feature-request-form')) {
-      window.customElements.define('snaps-feature-request-form', wcFeatureRequestForm);
+      window.customElements.define('snaps-feature-request-form', versioned(wcFeatureRequestForm));
     }
     if (!window.customElements.get('snaps-governance-docs')) {
-      window.customElements.define('snaps-governance-docs', wcGovernanceDocs);
+      window.customElements.define('snaps-governance-docs', versioned(wcGovernanceDocs));
     }
   }
 }

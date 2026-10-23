@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SupportChat } from '../src/components/SupportBoard/SupportChat';
 import { SnapsPublicClient } from '../src/api/snaps-client';
 import { readSupportEvents, recentContext } from '../src/api/support-chat';
+import { SnapsHttpError } from '../src/api/snaps-client';
 
 it('parses fragmented UTF-8 SSE and exposes only public fields', async () => {
   const raw = new TextEncoder().encode('data: {"type":"thinking","content":"secret"}\r\n\r\ndata: {"type":"token","content":"Olá","private":"secret"}\r\n\r\ndata: {"type":"done","incompleto":false}\n\n');
@@ -39,4 +40,24 @@ it('requires proposal confirmation and refreshes the created card once', async (
   fireEvent.change(screen.getByLabelText('Mensagem'), { target: { value: 'Relato' } }); fireEvent.click(screen.getByRole('button', { name: 'Enviar' }));
   const button = await screen.findByRole('button', { name: 'Confirmar criação' }); expect(confirm).not.toHaveBeenCalled(); fireEvent.click(button);
   await waitFor(() => expect(created).toHaveBeenCalledTimes(1)); expect(confirm).toHaveBeenCalledWith(expect.anything(), { hash: proposal.hash, version: 2 });
+});
+
+it('cancels the upstream request and preserves only this session partial', async () => {
+  vi.spyOn(SnapsPublicClient.prototype, 'createSupportSession').mockResolvedValue({ chat_id: 'A', session_token: 't', expires_at: '2030-01-01' });
+  const close = vi.spyOn(SnapsPublicClient.prototype, 'closeSupportSession').mockResolvedValue();
+  let signal: AbortSignal | undefined;
+  const send = vi.spyOn(SnapsPublicClient.prototype, 'sendSupportMessage').mockImplementation(async (_s, _p, cb, s) => { signal = s; cb({ type: 'token', content: 'Parcial desta sessão' }); await new Promise((_resolve, reject) => s?.addEventListener('abort', () => reject(new DOMException('Cancelled', 'AbortError')))); });
+  const v = render(<SupportChat projectId="p" apiKey="key" onCreated={vi.fn()} />);
+  await screen.findByLabelText('Mensagem'); fireEvent.change(screen.getByLabelText('Mensagem'), { target: { value: 'Relato' } }); fireEvent.click(screen.getByRole('button', { name: 'Enviar' }));
+  await screen.findByText('Parcial desta sessão'); fireEvent.click(screen.getByRole('button', { name: 'Cancelar resposta' }));
+  await screen.findByText('Resposta incompleta'); expect(signal?.aborted).toBe(true); expect(send).toHaveBeenCalledTimes(1);
+  v.unmount(); expect(close).toHaveBeenCalled();
+});
+it('expires the session and clears text on 410', async () => {
+  vi.spyOn(SnapsPublicClient.prototype, 'createSupportSession').mockResolvedValue({ chat_id: 'A', session_token: 't', expires_at: '2030-01-01' });
+  vi.spyOn(SnapsPublicClient.prototype, 'closeSupportSession').mockResolvedValue();
+  vi.spyOn(SnapsPublicClient.prototype, 'sendSupportMessage').mockRejectedValue(new SnapsHttpError(410));
+  render(<SupportChat projectId="p" apiKey="key" onCreated={vi.fn()} />); await screen.findByLabelText('Mensagem');
+  fireEvent.change(screen.getByLabelText('Mensagem'), { target: { value: 'Dado temporário' } }); fireEvent.click(screen.getByRole('button', { name: 'Enviar' }));
+  await screen.findByText(/Conversa expirada/); expect(screen.queryByText('Dado temporário')).toBeNull(); expect(screen.queryByLabelText('Mensagem')).toBeNull();
 });

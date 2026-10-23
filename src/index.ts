@@ -6,6 +6,7 @@ if (typeof window !== 'undefined') {
 }
 
 export { registerAll };
+export { version } from './version';
 export * from './api/snaps-client';
 export * from './components/SupportBoard';
 export * from './components/RoadmapBoard';

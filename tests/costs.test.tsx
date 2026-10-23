@@ -23,3 +23,16 @@ it('refuses an HTML response instead of saving it as a PDF', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>erro</html>', { headers: { 'Content-Type': 'text/html' } })));
   await expect(new SnapsPublicClient({ projectId: 'p', apiKey: 'key' }).fetchCostsReport({ startDate: '2026-10-01', endDate: '2026-10-31' })).rejects.toThrow('PDF');
 });
+it('paginates confirmed logs independently of the AI query', async () => {
+  const h = vi.spyOn(SnapsPublicClient.prototype, 'fetchHours').mockResolvedValueOnce({ ...hours, has_more: true, total: 101 }).mockResolvedValue({ ...hours, offset: 100 });
+  const l = vi.spyOn(SnapsPublicClient.prototype, 'fetchLlmCosts').mockResolvedValue(ai);
+  render(<CostsBoard projectId="p" apiKey="key" />);
+  await screen.findByText('Total de horas: 2'); fireEvent.click(screen.getByRole('button', { name: 'Próximos registros' }));
+  await waitFor(() => expect(h).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 100 }), expect.any(AbortSignal))); expect(l).toHaveBeenCalledTimes(1);
+});
+it('does not send an inverted period', async () => {
+  const h = vi.spyOn(SnapsPublicClient.prototype, 'fetchHours').mockResolvedValue(hours); vi.spyOn(SnapsPublicClient.prototype, 'fetchLlmCosts').mockResolvedValue(ai);
+  render(<CostsBoard projectId="p" apiKey="key" />); await screen.findByText('Total de horas: 2');
+  fireEvent.change(screen.getByLabelText('Início'), { target: { value: '2026-11-01' } }); fireEvent.change(screen.getByLabelText('Fim'), { target: { value: '2026-10-01' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Aplicar período' })); expect(screen.getByRole('alert').textContent).toContain('366'); expect(h).toHaveBeenCalledTimes(1);
+});
