@@ -6,10 +6,12 @@ if (typeof window !== 'undefined') {
 }
 
 export { registerAll };
+export { version } from './version';
 export * from './api/snaps-client';
 export * from './components/SupportBoard';
 export * from './components/RoadmapBoard';
 export * from './components/BugReportForm';
 export * from './components/FeatureRequestForm';
 export * from './components/GovernanceDocs';
+export * from './components/CostsBoard';
 export * from './components/shared';

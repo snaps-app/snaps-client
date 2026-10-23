@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SnapsCard, SnapsPublicClient, SupportListResponse } from '../../api/snaps-client';
 import { CardRow } from './CardRow';
 import { CardDetailModal } from './CardDetailModal';
 import { CreateCardModal } from './CreateCardModal';
+import { SupportChat } from './SupportChat';
 import { SearchInput, Pagination, toast } from '../shared';
 import { AlertCircle, Bug, Lightbulb, Loader2, Plus, RefreshCw } from 'lucide-react';
 
 export interface SupportBoardProps {
+  sessionUserRef?: string;
+  sessionKey?: string;
   projectId: string;
   apiKey: string;
   apiUrl?: string;
@@ -15,15 +18,22 @@ export interface SupportBoardProps {
   appName?: string;
 }
 
-export function SupportBoard({
+export function SupportBoard(props: SupportBoardProps) {
+  return <SupportView key={JSON.stringify([props.projectId, props.apiKey, props.apiUrl, props.sessionUserRef, props.sessionKey])} {...props} />;
+}
+function SupportView({
   projectId,
   apiKey,
   apiUrl,
   defaultTab = 'active',
   pageSize = 10,
   appName,
+  sessionUserRef,
+  sessionKey,
 }: SupportBoardProps) {
   const [activeTab, setActiveTab] = useState<'active' | 'history'>(defaultTab);
+  const [chatOpen, setChatOpen] = useState(false);
+  const requestGeneration = useRef(0);
 
   // Pagination States
   const [activeData, setActiveData] = useState<SupportListResponse | null>(null);
@@ -52,6 +62,7 @@ export function SupportBoard({
 
   // 1. Fetch function
   const fetchTickets = async (tab: 'active' | 'history') => {
+    const generation = ++requestGeneration.current;
     setIsLoading(true);
     setError(null);
     try {
@@ -62,19 +73,19 @@ export function SupportBoard({
           activePage * pageSize,
           'done' // exclude done
         );
-        setActiveData(data);
+        if (generation === requestGeneration.current) setActiveData(data);
       } else {
         const data = await client.fetchSupportCards(
           'done',
           pageSize,
           historyPage * pageSize
         );
-        setHistoryData(data);
+        if (generation === requestGeneration.current) setHistoryData(data);
       }
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar chamados.');
+      if (generation === requestGeneration.current) setError('Não foi possível carregar os chamados. Tente novamente.');
     } finally {
-      setIsLoading(false);
+      if (generation === requestGeneration.current) setIsLoading(false);
     }
   };
 
@@ -152,6 +163,8 @@ export function SupportBoard({
 
   return (
     <div className="space-y-6 w-full mx-auto">
+      <button type="button" className="snaps-button" onClick={() => setChatOpen(v => !v)}>{chatOpen ? 'Encerrar conversa' : 'Conversar com o suporte'}</button>
+      {chatOpen && <SupportChat projectId={projectId} apiKey={apiKey} apiUrl={apiUrl} sessionUserRef={sessionUserRef} sessionKey={sessionKey} onCreated={() => { fetchTickets(activeTab); }} />}
       {/* Header controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border shadow-sm">
         <div className="flex gap-2">

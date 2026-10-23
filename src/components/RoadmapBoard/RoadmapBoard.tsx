@@ -1,109 +1,65 @@
-import React, { useState, useEffect } from 'react';
-import { SnapsPublicClient, SnapsSprint, SnapsCard } from '../../api/snaps-client';
+import React, { useState, useEffect, useMemo } from 'react';
+import { SnapsPublicClient, SnapsSprint, SnapsCard, SprintStatus } from '../../api/snaps-client';
 import { SprintSection } from './SprintSection';
-import { AlertCircle, Loader2 } from 'lucide-react';
 
-export interface RoadmapBoardProps {
-  projectId: string;
-  apiKey: string;
-  apiUrl?: string;
-  showBacklog?: boolean;
+export interface RoadmapBoardProps { projectId: string; apiKey: string; apiUrl?: string; showBacklog?: boolean; }
+type Page<T> = { items: T[]; offset: number; total: number; more: boolean; loading: boolean; error: boolean };
+const initial = <T,>(): Page<T> => ({ items: [], offset: 0, total: 0, more: false, loading: true, error: false });
+const statuses: [SprintStatus, string][] = [['active', 'Ativas'], ['planning', 'Planejadas'], ['done', 'Concluídas'], ['cancelled', 'Canceladas']];
+function append<T extends { id: string }>(old: T[], next: T[]) { return [...new Map([...old, ...next].map(x => [x.id, x])).values()]; }
+
+export function RoadmapBoard(props: RoadmapBoardProps) {
+  return <RoadmapPages key={JSON.stringify([props.projectId, props.apiKey, props.apiUrl])} {...props} />;
 }
-
-export function RoadmapBoard({
-  projectId,
-  apiKey,
-  apiUrl,
-  showBacklog = true,
-}: RoadmapBoardProps) {
-  const [sprints, setSprints] = useState<SnapsSprint[]>([]);
-  const [backlog, setBacklog] = useState<SnapsCard[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const client = new SnapsPublicClient({ projectId, apiKey, apiUrl });
-
-  const fetchRoadmap = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await client.fetchRoadmapSprints();
-      setSprints(data.sprints || []);
-      setBacklog(data.backlog || []);
-    } catch (err: any) {
-      setError(err.message || 'Erro ao carregar o roadmap.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRoadmap();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2 min-h-[300px]">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
-        <span className="text-sm font-medium">Carregando roadmap...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-red-500 gap-2 border rounded-xl bg-white shadow-sm min-h-[300px]">
-        <AlertCircle className="w-8 h-8" />
-        <span className="text-sm font-semibold">{error}</span>
-        <button
-          type="button"
-          onClick={fetchRoadmap}
-          className="mt-2 text-xs bg-red-50 border border-red-200 px-3 py-1 rounded text-red-700 hover:bg-red-100"
-        >
-          Tentar Novamente
-        </button>
-      </div>
-    );
-  }
-
-  const hasNoContent = sprints.length === 0 && (!showBacklog || backlog.length === 0);
-
-  if (hasNoContent) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2 border rounded-xl bg-white shadow-sm min-h-[300px] text-center px-4">
-        <AlertCircle className="w-8 h-8 text-slate-300" />
-        <span className="text-sm font-semibold text-slate-500">Nenhum item no roadmap</span>
-        <span className="text-xs text-slate-400 max-w-xs">
-          Não há sprints cadastradas ou atividades no backlog público deste projeto.
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4 w-full mx-auto">
-      {/* Sprints list */}
-      {sprints.map(sprint => (
-        <SprintSection
-          key={sprint.id}
-          sprintName={sprint.name}
-          sprintStatus={sprint.status}
-          tag={sprint.tag}
-          cards={sprint.cards || []}
-          defaultExpanded={sprint.status.toLowerCase() === 'active'}
-        />
-      ))}
-
-      {/* Backlog Section */}
-      {showBacklog && backlog.length > 0 && (
-        <SprintSection
-          sprintName="Backlog de Pendências"
-          sprintStatus="backlog"
-          tag="Backlog"
-          cards={backlog}
-          defaultExpanded={sprints.length === 0} // Expand if there are no sprints
-        />
-      )}
+function RoadmapPages({ projectId, apiKey, apiUrl, showBacklog = true }: RoadmapBoardProps) {
+  const client = useMemo(() => new SnapsPublicClient({ projectId, apiKey, apiUrl }), [projectId, apiKey, apiUrl]);
+  const [selected, setSelected] = useState<SprintStatus[]>([]);
+  return <div className="space-y-4 w-full">
+    <div role="group" aria-label="Status das sprints" className="flex flex-wrap gap-2">
+      {statuses.map(([status, label]) => <button key={status} type="button" aria-pressed={selected.includes(status)} className="snaps-button" onClick={() => setSelected(s => s.includes(status) ? s.filter(x => x !== status) : [...s, status])}>{label}</button>)}
     </div>
-  );
+    <SprintPages key={selected.join(',')} client={client} selected={selected} />
+    {showBacklog && <BacklogPages client={client} />}
+  </div>;
 }
+function usePages<T extends { id: string }>(client: SnapsPublicClient, selected: SprintStatus[], kind: 'sprints' | 'backlog') {
+  const [page, setPage] = useState<Page<T>>(initial);
+  const [request, setRequest] = useState({ offset: 0, retry: 0 });
+  const filter = selected.join(',');
+  useEffect(() => {
+    const abort = new AbortController(); let current = true;
+    setPage(p => ({ ...p, loading: true, error: false }));
+    const offset = request.offset;
+    client.fetchRoadmapSprints({ limit: 10, offset: kind === 'sprints' ? offset : 0, sprintStatus: selected, backlogLimit: 20, backlogOffset: kind === 'backlog' ? offset : 0 }, abort.signal).then(data => {
+      if (!current) return;
+      const items = (kind === 'sprints' ? data.sprints : data.backlog) as unknown as T[];
+      setPage(p => ({ items: offset ? append(p.items, items) : items, offset: offset + items.length, total: (kind === 'sprints' ? data.total : data.backlog_total) ?? items.length, more: (kind === 'sprints' ? data.has_more : data.backlog_has_more) ?? false, loading: false, error: false }));
+    }).catch(() => { if (current) setPage(p => ({ ...p, loading: false, error: true })); });
+    return () => { current = false; abort.abort(); };
+  }, [client, kind, filter, request]);
+  return { page, more: () => setRequest({ offset: page.offset, retry: 0 }), retry: () => setRequest(r => ({ ...r, retry: r.retry + 1 })) };
+}
+function PageControls({ page, more, retry, name }: { page: Page<unknown>; more: () => void; retry: () => void; name: string }) {
+  return <>
+    {page.loading && <p role="status">Carregando {name}...</p>}
+    {page.error && <div role="alert">Não foi possível carregar {name}. <button type="button" className="snaps-button" onClick={retry}>Tentar novamente {name}</button></div>}
+    {page.more && !page.error && <button type="button" className="snaps-button" disabled={page.loading} onClick={more}>Carregar mais {name}</button>}
+  </>;
+}
+function SprintPages({ client, selected }: { client: SnapsPublicClient; selected: SprintStatus[] }) {
+  const controls = usePages<SnapsSprint>(client, selected, 'sprints');
+  return <section aria-label="Sprints" className="space-y-4"><p>{controls.page.total} sprints</p>
+    {!controls.page.loading && !controls.page.error && !controls.page.items.length && <p>Nenhuma sprint neste filtro.</p>}
+    {controls.page.items.map(s => <SprintSection key={s.id} sprintName={s.name} sprintStatus={s.status} tag={s.tag} cards={s.cards || []} defaultExpanded={s.status === 'active'} />)}
+    <PageControls {...controls} name="sprints" />
+  </section>;
+}
+function BacklogPages({ client }: { client: SnapsPublicClient }) {
+  const controls = usePages<SnapsCard>(client, [], 'backlog');
+  return <section aria-label="Backlog" className="space-y-4"><p>{controls.page.total} itens no backlog</p>
+    {!controls.page.loading && !controls.page.error && !controls.page.items.length && <p>Nenhum item no backlog.</p>}
+    {!!controls.page.items.length && <SprintSection sprintName="Backlog de Pendências" sprintStatus="backlog" cards={controls.page.items} defaultExpanded />}
+    <PageControls {...controls} name="backlog" />
+  </section>;
+}
+

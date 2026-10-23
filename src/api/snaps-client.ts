@@ -1,3 +1,8 @@
+import { AttachmentResponse, readSupportEvents, SupportEvent, SupportMessage, SupportSession } from './support-chat';
+import { CostPeriod, HoursOptions, HoursResponse, LlmCostsResponse } from './costs';
+export * from './support-chat';
+export * from './costs';
+
 export interface SnapsPublicClientConfig {
   projectId: string;
   apiKey: string;
@@ -23,6 +28,8 @@ export interface CardMetadata {
 }
 
 export interface SnapsCard {
+  editable?: boolean;
+  edit_reason?: string | null;
   id: string;
   code?: string;
   title: string;
@@ -55,7 +62,18 @@ export interface PublicRoadmapResponse {
   project_id: string;
   sprints: SnapsSprint[];
   backlog: SnapsCard[];
+  total?: number;
+  limit?: number;
+  offset?: number;
+  has_more?: boolean;
+  backlog_total?: number;
+  backlog_limit?: number;
+  backlog_offset?: number;
+  backlog_has_more?: boolean;
 }
+
+export type SprintStatus = 'planning' | 'active' | 'done' | 'cancelled';
+export interface RoadmapOptions { limit?: number; offset?: number; sprintStatus?: SprintStatus[]; backlogLimit?: number; backlogOffset?: number; }
 
 export interface PublicDocSummary {
   id: string;
@@ -66,6 +84,11 @@ export interface PublicDocSummary {
 
 export interface PublicDocDetail extends PublicDocSummary {
   content: string;
+}
+
+export interface SupportCardEdit { title?: string; description?: string; card_metadata?: CardMetadata; }
+export class SnapsHttpError extends Error {
+  constructor(public readonly status: number) { super(`Não foi possível concluir a solicitação (HTTP ${status}).`); this.name = 'SnapsHttpError'; }
 }
 
 export class SnapsPublicClient {
@@ -88,6 +111,43 @@ export class SnapsPublicClient {
       'Content-Type': 'application/json',
       'X-API-Key': this.apiKey,
     };
+  }
+
+  async updateSupportCard(cardId: string, payload: SupportCardEdit): Promise<SnapsCard> {
+    const res = await fetch(`${this.apiUrl}/public/projects/${this.projectId}/support/cards/${encodeURIComponent(cardId)}`, { method: 'PATCH', headers: this.getHeaders(), body: JSON.stringify(payload) });
+    if (!res.ok) throw new SnapsHttpError(res.status);
+    return res.json();
+  }
+
+  private async costsRequest(path: string, period: CostPeriod, extra: Record<string, string | number | undefined>, signal?: AbortSignal) {
+    const query = new URLSearchParams({ start_date: period.startDate, end_date: period.endDate });
+    Object.entries(extra).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
+    const res = await fetch(`${this.apiUrl}/public/projects/${this.projectId}/costs/${path}?${query}`, { headers: this.getHeaders(), signal });
+    if (!res.ok) throw new SnapsHttpError(res.status);
+    return res;
+  }
+  async fetchHours(options: HoursOptions, signal?: AbortSignal): Promise<HoursResponse> { return (await this.costsRequest('hours', options, { person_id: options.personId, limit: options.limit ?? 100, offset: options.offset ?? 0 }, signal)).json(); }
+  async fetchLlmCosts(options: CostPeriod & { conversationId?: string }, signal?: AbortSignal): Promise<LlmCostsResponse> { return (await this.costsRequest('llm', options, { conversation_id: options.conversationId }, signal)).json(); }
+  async fetchCostsReport(options: CostPeriod & { personId?: string }, signal?: AbortSignal): Promise<Blob> {
+    const res = await this.costsRequest('report', options, { person_id: options.personId }, signal);
+    if (res.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/pdf') throw new Error('Relatório PDF indisponível. Tente novamente.');
+    const bytes = await res.arrayBuffer();
+    if (new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error('Relatório PDF inválido. Tente novamente.');
+    return new Blob([bytes], { type: 'application/pdf' });
+  }
+
+  private async supportRequest(path: string, payload: unknown, session?: SupportSession, signal?: AbortSignal, keepalive = false) {
+    const res = await fetch(`${this.apiUrl}/public/projects/${this.projectId}/support/chats${path}`, { method: 'POST', headers: { ...this.getHeaders(), ...(session ? { 'X-Support-Session': session.session_token } : {}) }, body: JSON.stringify(payload), signal, keepalive });
+    if (!res.ok) throw new SnapsHttpError(res.status);
+    return res;
+  }
+  async createSupportSession(sessionUserRef?: string): Promise<SupportSession> { return (await this.supportRequest('', { session_user_ref: sessionUserRef || null })).json(); }
+  async closeSupportSession(session: SupportSession): Promise<void> { await this.supportRequest(`/${encodeURIComponent(session.chat_id)}/close`, {}, session, undefined, true); }
+  async confirmSupportProposal(session: SupportSession, proposal: { hash: string; version: number }): Promise<SnapsCard> { return (await this.supportRequest(`/${encodeURIComponent(session.chat_id)}/confirm`, proposal, session)).json(); }
+  async sendSupportMessage(session: SupportSession, payload: SupportMessage, receive: (event: SupportEvent) => void, signal?: AbortSignal): Promise<void> {
+    const res = await this.supportRequest(`/${encodeURIComponent(session.chat_id)}/messages`, payload, session, signal);
+    if (!res.headers.get('Content-Type')?.toLowerCase().includes('text/event-stream') || !res.body) throw new Error('Resposta de suporte inválida.');
+    await readSupportEvents(res.body, receive);
   }
 
   async fetchSupportCards(
@@ -164,16 +224,23 @@ export class SnapsPublicClient {
     }
   }
 
-  async fetchRoadmapSprints(): Promise<PublicRoadmapResponse> {
-    const url = `${this.apiUrl}/public/projects/${this.projectId}/roadmap`;
-    const res = await fetch(url, { headers: this.getHeaders() });
+  async fetchRoadmapSprints(options?: RoadmapOptions, signal?: AbortSignal): Promise<PublicRoadmapResponse> {
+    const params = new URLSearchParams();
+    if (options) {
+      for (const [key, value] of Object.entries({ limit: options.limit, offset: options.offset, backlog_limit: options.backlogLimit, backlog_offset: options.backlogOffset })) {
+        if (value !== undefined) params.set(key, String(value));
+      }
+      options.sprintStatus?.forEach(status => params.append('sprint_status', status));
+    }
+    const url = `${this.apiUrl}/public/projects/${this.projectId}/roadmap${params.size ? `?${params}` : ''}`;
+    const res = await fetch(url, { headers: this.getHeaders(), signal });
     if (!res.ok) {
       throw new Error(`SnapsPublicClient.fetchRoadmapSprints: HTTP ${res.status}`);
     }
     return res.json();
   }
 
-  async uploadAttachment(file: File): Promise<{ url: string }> {
+  async uploadAttachment(file: File, signal?: AbortSignal): Promise<AttachmentResponse> {
     const url = `${this.apiUrl}/public/projects/${this.projectId}/support/upload`;
     const formData = new FormData();
     formData.append('file', file);
@@ -184,9 +251,10 @@ export class SnapsPublicClient {
         'X-API-Key': this.apiKey,
       },
       body: formData,
+      signal,
     });
     if (!res.ok) {
-      throw new Error(`SnapsPublicClient.uploadAttachment: HTTP ${res.status}`);
+      throw new SnapsHttpError(res.status);
     }
     return res.json();
   }

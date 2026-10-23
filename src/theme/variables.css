@@ -23,3 +23,15 @@
   font-size: var(--snaps-font-size-base);
   color: var(--snaps-text);
 }
+
+.snaps-button { border: 1px solid var(--snaps-border); border-radius: var(--snaps-radius); padding: .5rem .85rem; background: var(--snaps-bg); color: var(--snaps-text); }
+.snaps-button:hover, .snaps-button[aria-pressed="true"] { background: var(--snaps-primary); color: white; }
+.snaps-button:disabled { opacity: .5; cursor: default; }
+:focus-visible { outline: 2px solid var(--snaps-primary); outline-offset: 3px; }
+.snaps-doc-focus { position: fixed; inset: 0; z-index: 1000; overflow-y: auto; background: var(--snaps-bg); color: var(--snaps-text); padding: 24px; }
+.snaps-doc-focus article { margin-top: 24px; }
+.snaps-costs, .snaps-chat { color: var(--snaps-text); background: var(--snaps-bg); }
+.snaps-costs section { border: 1px solid var(--snaps-border); border-radius: var(--snaps-radius); padding: var(--snaps-spacing); }
+.snaps-costs table { width: 100%; text-align: left; border-collapse: collapse; }
+.snaps-costs th, .snaps-costs td { padding: 8px; border-bottom: 1px solid var(--snaps-border); }
+.snaps-costs input, .snaps-costs select { display: block; padding: 8px; border: 1px solid var(--snaps-border); border-radius: var(--snaps-radius); background: var(--snaps-bg); color: var(--snaps-text); }

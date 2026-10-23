@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SnapsPublicClient, PublicDocSummary, PublicDocDetail } from '../../api/snaps-client';
 import { DocTypeBadge } from './DocTypeBadge';
 import { DocViewer } from './DocViewer';
@@ -16,7 +16,10 @@ type ViewState =
   | { mode: 'list' }
   | { mode: 'detail'; docId: string; docName: string };
 
-export function GovernanceDocs({
+export function GovernanceDocs(props: GovernanceDocsProps) {
+  return <GovernanceView key={JSON.stringify([props.projectId, props.apiKey, props.apiUrl])} {...props} />;
+}
+function GovernanceView({
   projectId,
   apiKey,
   apiUrl,
@@ -35,6 +38,7 @@ export function GovernanceDocs({
 
   // Filter state
   const [search, setSearch] = useState('');
+  const detailGeneration = useRef(0);
 
   const client = new SnapsPublicClient({ projectId, apiKey, apiUrl });
 
@@ -54,15 +58,17 @@ export function GovernanceDocs({
 
   // 2. Fetch doc detail
   const fetchDocDetail = async (docId: string) => {
+    const generation = ++detailGeneration.current;
+    setActiveDoc(null);
     setIsLoadingDetail(true);
     setDetailError(null);
     try {
       const detail = await client.fetchDocDetail(docId);
-      setActiveDoc(detail);
+      if (generation === detailGeneration.current) setActiveDoc(detail);
     } catch (err: any) {
-      setDetailError(err.message || 'Erro ao carregar detalhes do documento.');
+      if (generation === detailGeneration.current) setDetailError('Não foi possível carregar este documento.');
     } finally {
-      setIsLoadingDetail(false);
+      if (generation === detailGeneration.current) setIsLoadingDetail(false);
     }
   };
 
@@ -76,6 +82,7 @@ export function GovernanceDocs({
     if (view.mode === 'detail') {
       fetchDocDetail(view.docId);
     } else {
+      detailGeneration.current += 1;
       setActiveDoc(null);
     }
   }, [view]);
