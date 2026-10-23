@@ -1,3 +1,6 @@
+import { AttachmentResponse, readSupportEvents, SupportEvent, SupportMessage, SupportSession } from './support-chat';
+export * from './support-chat';
+
 export interface SnapsPublicClientConfig {
   projectId: string;
   apiKey: string;
@@ -114,6 +117,20 @@ export class SnapsPublicClient {
     return res.json();
   }
 
+  private async supportRequest(path: string, payload: unknown, session?: SupportSession, signal?: AbortSignal, keepalive = false) {
+    const res = await fetch(`${this.apiUrl}/public/projects/${this.projectId}/support/chats${path}`, { method: 'POST', headers: { ...this.getHeaders(), ...(session ? { 'X-Support-Session': session.session_token } : {}) }, body: JSON.stringify(payload), signal, keepalive });
+    if (!res.ok) throw new SnapsHttpError(res.status);
+    return res;
+  }
+  async createSupportSession(sessionUserRef?: string): Promise<SupportSession> { return (await this.supportRequest('', { session_user_ref: sessionUserRef || null })).json(); }
+  async closeSupportSession(session: SupportSession): Promise<void> { await this.supportRequest(`/${encodeURIComponent(session.chat_id)}/close`, {}, session, undefined, true); }
+  async confirmSupportProposal(session: SupportSession, proposal: { hash: string; version: number }): Promise<SnapsCard> { return (await this.supportRequest(`/${encodeURIComponent(session.chat_id)}/confirm`, proposal, session)).json(); }
+  async sendSupportMessage(session: SupportSession, payload: SupportMessage, receive: (event: SupportEvent) => void, signal?: AbortSignal): Promise<void> {
+    const res = await this.supportRequest(`/${encodeURIComponent(session.chat_id)}/messages`, payload, session, signal);
+    if (!res.headers.get('Content-Type')?.toLowerCase().includes('text/event-stream') || !res.body) throw new Error('Resposta de suporte inválida.');
+    await readSupportEvents(res.body, receive);
+  }
+
   async fetchSupportCards(
     status?: string,
     limit: number = 20,
@@ -204,7 +221,7 @@ export class SnapsPublicClient {
     return res.json();
   }
 
-  async uploadAttachment(file: File): Promise<{ url: string }> {
+  async uploadAttachment(file: File, signal?: AbortSignal): Promise<AttachmentResponse> {
     const url = `${this.apiUrl}/public/projects/${this.projectId}/support/upload`;
     const formData = new FormData();
     formData.append('file', file);
@@ -215,9 +232,10 @@ export class SnapsPublicClient {
         'X-API-Key': this.apiKey,
       },
       body: formData,
+      signal,
     });
     if (!res.ok) {
-      throw new Error(`SnapsPublicClient.uploadAttachment: HTTP ${res.status}`);
+      throw new SnapsHttpError(res.status);
     }
     return res.json();
   }

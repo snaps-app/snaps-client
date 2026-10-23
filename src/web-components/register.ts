@@ -15,6 +15,8 @@ const wcSupportBoard = r2wc(withShadowStyles(SupportBoard), {
     apiKey: 'string',
     apiUrl: 'string',
     defaultTab: 'string',
+    sessionUserRef: 'string',
+    sessionKey: 'string',
     pageSize: 'number',
     appName: 'string',
   },
