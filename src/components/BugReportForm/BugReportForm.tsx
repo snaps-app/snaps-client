@@ -3,8 +3,11 @@ import { SnapsPublicClient } from '../../api/snaps-client';
 import { detectEnvironment } from './EnvironmentDetector';
 import { FileUploadZone, toast, ToastContainer } from '../shared';
 import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { SupportEditForm, SupportEditFormProps } from '../SupportBoard/SupportEditForm';
 
 export interface BugReportFormProps {
+  initialValues?: SupportEditFormProps['initialValues'];
+  onEditSubmit?: SupportEditFormProps['onEditSubmit'];
   projectId: string;
   apiKey: string;
   apiUrl?: string;
@@ -14,7 +17,10 @@ export interface BugReportFormProps {
   onCancel?: () => void;
 }
 
-export function BugReportForm({
+export function BugReportForm(props: BugReportFormProps) {
+  return props.initialValues ? <SupportEditForm {...props} initialValues={props.initialValues} /> : <CreateBugReportForm {...props} />;
+}
+function CreateBugReportForm({
   projectId,
   apiKey,
   apiUrl,

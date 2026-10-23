@@ -23,6 +23,8 @@ export interface CardMetadata {
 }
 
 export interface SnapsCard {
+  editable?: boolean;
+  edit_reason?: string | null;
   id: string;
   code?: string;
   title: string;
@@ -79,6 +81,11 @@ export interface PublicDocDetail extends PublicDocSummary {
   content: string;
 }
 
+export interface SupportCardEdit { title?: string; description?: string; card_metadata?: CardMetadata; }
+export class SnapsHttpError extends Error {
+  constructor(public readonly status: number) { super(`Não foi possível concluir a solicitação (HTTP ${status}).`); this.name = 'SnapsHttpError'; }
+}
+
 export class SnapsPublicClient {
   private projectId: string;
   private apiKey: string;
@@ -99,6 +106,12 @@ export class SnapsPublicClient {
       'Content-Type': 'application/json',
       'X-API-Key': this.apiKey,
     };
+  }
+
+  async updateSupportCard(cardId: string, payload: SupportCardEdit): Promise<SnapsCard> {
+    const res = await fetch(`${this.apiUrl}/public/projects/${this.projectId}/support/cards/${encodeURIComponent(cardId)}`, { method: 'PATCH', headers: this.getHeaders(), body: JSON.stringify(payload) });
+    if (!res.ok) throw new SnapsHttpError(res.status);
+    return res.json();
   }
 
   async fetchSupportCards(

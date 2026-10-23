@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { SnapsPublicClient } from '../../api/snaps-client';
 import { FileUploadZone, toast, ToastContainer } from '../shared';
 import { Loader2 } from 'lucide-react';
+import { SupportEditForm, SupportEditFormProps } from '../SupportBoard/SupportEditForm';
 
 export interface FeatureRequestFormProps {
+  initialValues?: SupportEditFormProps['initialValues'];
+  onEditSubmit?: SupportEditFormProps['onEditSubmit'];
   projectId: string;
   apiKey: string;
   apiUrl?: string;
@@ -12,7 +15,10 @@ export interface FeatureRequestFormProps {
   onCancel?: () => void;
 }
 
-export function FeatureRequestForm({
+export function FeatureRequestForm(props: FeatureRequestFormProps) {
+  return props.initialValues ? <SupportEditForm {...props} initialValues={props.initialValues} /> : <CreateFeatureRequestForm {...props} />;
+}
+function CreateFeatureRequestForm({
   projectId,
   apiKey,
   apiUrl,
