@@ -18,7 +18,7 @@ export function DocViewer({ doc, onBack }: DocViewerProps) {
   const trap = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { e.stopPropagation(); setFocused(false); }
     if (focused && e.key === 'Tab') {
-      const nodes = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button, a[href], input, textarea, select, [tabindex="0"]') || []).filter(x => !x.hasAttribute('disabled'));
+      const nodes = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button, a[href], input, textarea, select, [tabindex="0"]') || []).filter(x => !x.hasAttribute('disabled') && !x.hidden && x.getAttribute('aria-hidden') !== 'true');
       const root = dialog.current?.getRootNode() as Document | ShadowRoot;
       const index = nodes.indexOf(root.activeElement as HTMLElement);
       if ((e.shiftKey && index <= 0) || (!e.shiftKey && (index === nodes.length - 1 || index === -1))) { e.preventDefault(); nodes[e.shiftKey ? nodes.length - 1 : 0]?.focus(); }

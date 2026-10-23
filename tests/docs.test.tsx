@@ -9,6 +9,9 @@ it('opens focus mode, traps keyboard focus and restores it on Escape in Shadow D
   const view = render(<DocViewer doc={doc} onBack={vi.fn()} />, { container: target, baseElement: target });
   const expand = view.getByRole('button', { name: 'Ampliar' }); expand.focus(); fireEvent.click(expand);
   const dialog = view.getByRole('dialog'); expect(shadow.activeElement && dialog.contains(shadow.activeElement)).toBe(true);
+  const close = view.getByRole('button', { name: 'Fechar foco' });
+  fireEvent.keyDown(close, { key: 'Tab', shiftKey: true }); expect(shadow.activeElement).toBe(view.getByRole('button', { name: 'Imprimir / PDF' }));
+  fireEvent.keyDown(shadow.activeElement!, { key: 'Tab' }); expect(shadow.activeElement).toBe(close);
   fireEvent.keyDown(dialog, { key: 'Escape' }); expect(view.queryByRole('dialog')).toBeNull(); expect(shadow.activeElement).toBe(expand); host.remove();
 });
 it('downloads original markdown with a sanitized name and revokes its URL', () => {

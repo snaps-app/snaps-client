@@ -82,14 +82,19 @@ it('downloads exact Markdown and creates an isolated real multipage A4 PDF', asy
     const article = docs.locator('article'); await article.getByText('Seção 45', { exact: true }).first().waitFor();
     expect(await article.evaluate(el => getComputedStyle(el).maxHeight)).toBe('none');
     await docs.getByRole('button', { name: 'Ampliar', exact: true }).click(); await docs.getByRole('dialog').waitFor();
+    await page.keyboard.press('Shift+Tab'); expect(await docs.getByRole('link', { name: 'Ajuda' }).evaluate(el => el.getRootNode() instanceof ShadowRoot && (el.getRootNode() as ShadowRoot).activeElement === el)).toBe(true);
+    await page.keyboard.press('Tab'); expect(await docs.getByRole('button', { name: 'Fechar foco' }).evaluate(el => (el.getRootNode() as ShadowRoot).activeElement === el)).toBe(true);
     await page.keyboard.press('Escape'); expect(await docs.getByRole('dialog').count()).toBe(0);
     const downloadPromise = page.waitForEvent('download'); await docs.getByRole('button', { name: 'Baixar MD' }).click(); const download = await downloadPromise;
     const stream = await download.createReadStream(); const chunks: Buffer[] = []; for await (const chunk of stream!) chunks.push(Buffer.from(chunk)); expect(Buffer.concat(chunks).toString('utf8')).toBe(markdown);
     const popupPromise = page.waitForEvent('popup'); await docs.getByRole('button', { name: 'Imprimir / PDF' }).click(); const popup = await popupPromise;
     await popup.locator('article').waitFor(); expect(await popup.evaluate(() => window.opener)).toBeNull(); expect(await popup.locator('script').count()).toBe(0);
+    await popup.waitForFunction(() => (window as unknown as { printCalled?: boolean }).printCalled === true);
     expect(await popup.evaluate(() => (window as unknown as { evil?: boolean }).evil)).toBeUndefined();
     const pdf = await popup.pdf({ preferCSSPageSize: true, printBackground: true });
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-'); const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length; expect(pages).toBeGreaterThan(1);
+    const mediaBox = /\/MediaBox\s*\[0 0 ([\d.]+) ([\d.]+)\]/.exec(pdf.toString('latin1'));
+    expect(mediaBox).toBeTruthy(); expect(Math.abs(Number(mediaBox![1]) - 595.28)).toBeLessThan(1); expect(Math.abs(Number(mediaBox![2]) - 841.89)).toBeLessThan(1);
     console.log('Real browser PDF:', pages, 'A4 pages;', pdf.length, 'bytes; SHA256', createHash('sha256').update(pdf).digest('hex'));
     expect(errors).toEqual([]); await popup.close();
   } finally { await context.close(); }
