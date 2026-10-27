@@ -30,8 +30,8 @@
 .snaps-roadmap-filter { position: relative; width: max-content; max-width: 100%; }
 .snaps-roadmap-filter > summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; border: 1px solid var(--snaps-border); border-radius: var(--snaps-radius); padding: 10px 14px; background: var(--snaps-bg); font-weight: 600; }
 .snaps-roadmap-filter > summary::-webkit-details-marker { display: none; }
-.snaps-roadmap-filter fieldset { position: absolute; top: calc(100% + 8px); left: 0; z-index: 20; width: 240px; padding: 16px; border: 1px solid var(--snaps-border); border-radius: var(--snaps-radius); background: var(--snaps-bg); box-shadow: 0 12px 28px #00000012; }
-.snaps-roadmap-filter legend { float: left; width: 100%; margin-bottom: 8px; font-weight: 600; }
+.snaps-roadmap-filter .snaps-filter-options { position: absolute; top: calc(100% + 8px); left: 0; z-index: 20; width: 240px; max-width: calc(100vw - 32px); padding: 16px; border: 1px solid var(--snaps-border); border-radius: var(--snaps-radius); background: var(--snaps-bg); box-shadow: 0 12px 28px #00000012; }
+.snaps-filter-options > p { margin-bottom: 8px; font-weight: 600; }
 .snaps-roadmap-filter label { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
 .snaps-roadmap-filter input { accent-color: var(--snaps-primary); }
 .snaps-filter-count { border-radius: 20px; background: var(--snaps-primary); color: white; padding: 0 6px; font-size: 12px; }
@@ -87,7 +87,12 @@
 :focus-visible { outline: 2px solid var(--snaps-primary); outline-offset: 3px; }
 .snaps-doc-focus { position: fixed; inset: 0; z-index: 1000; overflow-y: auto; background: var(--snaps-bg); color: var(--snaps-text); padding: 24px; }
 .snaps-doc-focus article { margin-top: 24px; }
-.snaps-costs, .snaps-chat { color: var(--snaps-text); background: var(--snaps-bg); }
+.snaps-costs, .snaps-chat { color: var(--snaps-text); }
+.snaps-chat { background: var(--snaps-bg); }
+.snaps-costs { background: transparent; }
+.snaps-costs-heading, .snaps-cost-filters, .snaps-hours-chart { background: var(--snaps-bg); border: 1px solid var(--snaps-border); border-radius: 12px; padding: 16px; box-shadow: 0 1px 2px #00000008; }
+.snaps-hours-chart { padding: 16px; }
+.snaps-time-group, .snaps-costs table { background: var(--snaps-bg); }
 .snaps-costs table { width: 100%; text-align: left; border-collapse: collapse; }
 .snaps-costs th, .snaps-costs td { padding: 8px; border-bottom: 1px solid var(--snaps-border); }
 .snaps-costs input, .snaps-costs select { display: block; padding: 8px; border: 1px solid var(--snaps-border); border-radius: var(--snaps-radius); background: var(--snaps-bg); color: var(--snaps-text); }

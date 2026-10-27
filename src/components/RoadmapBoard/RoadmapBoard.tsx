@@ -18,10 +18,10 @@ function RoadmapPages({ projectId, apiKey, apiUrl, showBacklog = true }: Roadmap
   return <div className="space-y-4 w-full">
     <details className="snaps-roadmap-filter" onKeyDown={e => { if (e.key === 'Escape') { e.currentTarget.open = false; e.currentTarget.querySelector('summary')?.focus(); } }}>
       <summary><Filter size={16} aria-hidden="true" /> Filtrar sprints {selected.length > 0 && <span className="snaps-filter-count">{selected.length}</span>}<ChevronDown size={14} aria-hidden="true" /></summary>
-      <fieldset><legend>Status das sprints</legend>
+      <div role="group" aria-label="Status das sprints" className="snaps-filter-options"><p>Status das sprints</p>
         {statuses.map(([status, label]) => <label key={status}><input type="checkbox" checked={selected.includes(status)} onChange={() => setSelected(s => s.includes(status) ? s.filter(x => x !== status) : [...s, status])} />{label}</label>)}
         <button type="button" className="snaps-button" disabled={!selected.length} onClick={() => setSelected([])}>Limpar filtros</button>
-      </fieldset>
+      </div>
     </details>
     <SprintPages key={selected.join(',')} client={client} selected={selected} />
     {showBacklog && <BacklogPages client={client} />}
