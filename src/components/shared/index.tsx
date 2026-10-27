@@ -332,7 +332,6 @@ export function FileUploadZone({ files, onFilesChange }: FileUploadZoneProps) {
   );
 }
 
-// === Toast ===
 function FilePreview({ file }: { file: File }) {
   const [url, setUrl] = React.useState('');
   React.useEffect(() => { const value = URL.createObjectURL(file); setUrl(value); return () => URL.revokeObjectURL(value); }, [file]);
