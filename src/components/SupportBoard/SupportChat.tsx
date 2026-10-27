@@ -115,7 +115,7 @@ function ChatSession({ projectId, apiKey, apiUrl, appName, sessionUserRef, onCre
     {error && <p role="alert">{error}</p>}
     {expired && <p role="status">Conversa expirada. Inicie uma nova conversa para continuar.</p>}
     {!ready && !error && !expired && <p role="status">Iniciando conversa...</p>}
-    {(!ready || created) && <button type="button" className="snaps-button" onClick={() => setEntry(v => v + 1)}>Nova conversa</button>}
+    {(expired || (!ready && error) || created) && <button type="button" className="snaps-button" onClick={() => setEntry(v => v + 1)}>Nova conversa</button>}
     {proposal && !created && <section aria-label="Proposta de chamado" className="border rounded p-4 space-y-3"><h3>{proposal.proposal.title}</h3><p>{proposal.proposal.card_type === 'bug' ? 'Relato de bug' : 'Sugestão de melhoria'}</p><TicketFields proposal={proposal} /><MarkdownRenderer content={proposal.proposal.description} /><p>Revise os campos. Para corrigir algum dado, envie uma mensagem antes de confirmar.</p><button type="button" className="snaps-button" disabled={busy} onClick={() => { void confirm(); }}>Confirmar criação</button></section>}
     {created && <p role="status">Chamado criado: {created.code || created.id} — {created.title}</p>}
     {ready && !created && <form onSubmit={send} className="space-y-3">
