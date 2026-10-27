@@ -5,7 +5,7 @@ export interface Person { id: string; display_name: string; }
 export interface HourPoint { date: string; person_id: string; hours: DecimalValue; }
 export interface HoursResponse {
   start_date: string; end_date: string; person_id: string | null; people: Person[]; series: HourPoint[]; total_hours: DecimalValue;
-  items: (HourPoint & { id: string; description: string | null })[]; total: number; limit: number; offset: number; has_more: boolean;
+  items: (HourPoint & { id: string; description: string | null; reference_id?: string | null; reference_title?: string | null })[]; total: number; limit: number; offset: number; has_more: boolean;
 }
 export interface LlmSummary {
   currency: 'USD'; usage_count: number; known_cost_usd: DecimalValue | null; total_cost_usd: DecimalValue | null; estimated_cost_usd: DecimalValue | null;

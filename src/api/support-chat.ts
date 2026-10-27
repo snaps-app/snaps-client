@@ -1,7 +1,8 @@
+import type { CardMetadata } from './snaps-client';
 export interface SupportSession { chat_id: string; session_token: string; expires_at: string; }
 export interface RecentMessage { role: 'user' | 'assistant'; content: string; }
 export interface SupportMessage { client_message_id: string; text: string; context: RecentMessage[]; attachment_ids: string[]; }
-export interface SupportProposal { title: string; description: string; card_type: 'bug' | 'improvement'; attachment_ids: string[]; }
+export interface SupportProposal { title: string; description: string; card_type: 'bug' | 'improvement'; attachment_ids: string[]; card_metadata?: CardMetadata; }
 export type ProposalEvent = { type: 'proposal'; proposal: SupportProposal; hash: string; version: number };
 export type SupportEvent = { type: 'token'; content: string } | { type: 'done'; incompleto: boolean } | { type: 'error'; message: string } | { type: 'guardrail_tripped'; message: string } | ProposalEvent;
 export interface AttachmentResponse { url: string; attachment_id: string; mime_type: string; size_bytes: number; }
@@ -25,7 +26,13 @@ function publicEvent(value: unknown): SupportEvent | null {
   if (v.type === 'proposal' && typeof v.hash === 'string' && /^[a-f0-9]{64}$/.test(v.hash) && Number.isInteger(v.version) && Number(v.version) > 0 && v.proposal && typeof v.proposal === 'object') {
     const p = v.proposal as Record<string, unknown>;
     if (typeof p.title === 'string' && typeof p.description === 'string' && (p.card_type === 'bug' || p.card_type === 'improvement') && Array.isArray(p.attachment_ids) && p.attachment_ids.every(x => typeof x === 'string')) {
-      return { type: 'proposal', hash: v.hash, version: Number(v.version), proposal: { title: p.title, description: p.description, card_type: p.card_type, attachment_ids: p.attachment_ids as string[] } };
+      const metadata: Record<string, string | boolean> = {};
+      if (p.card_metadata && typeof p.card_metadata === 'object') {
+        const raw = p.card_metadata as Record<string, unknown>;
+        for (const key of ['application', 'module', 'actual_behavior', 'expected_behavior', 'steps_to_reproduce', 'severity', 'frequency', 'users_affected', 'workaround_description', 'problem_or_opportunity', 'proposed_solution', 'expected_impact', 'priority_justification', 'browser', 'os', 'screen_resolution', 'app_version']) if (typeof raw[key] === 'string') metadata[key] = (raw[key] as string).slice(0, 4000);
+        for (const key of ['blocks_critical_flow', 'has_workaround']) if (typeof raw[key] === 'boolean') metadata[key] = raw[key] as boolean;
+      }
+      return { type: 'proposal', hash: v.hash, version: Number(v.version), proposal: { title: p.title, description: p.description, card_type: p.card_type, attachment_ids: p.attachment_ids as string[], card_metadata: metadata } };
     }
   }
   return null;

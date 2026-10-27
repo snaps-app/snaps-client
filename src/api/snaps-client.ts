@@ -10,6 +10,11 @@ export interface SnapsPublicClientConfig {
 }
 
 export interface CardMetadata {
+  application?: string;
+  module?: string;
+  actual_behavior?: string;
+  expected_behavior?: string;
+  steps_to_reproduce?: string;
   browser?: string;
   os?: string;
   screen_resolution?: string;

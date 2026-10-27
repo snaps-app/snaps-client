@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AttachmentResponse, ProposalEvent, recentContext, RecentMessage, SnapsCard, SnapsHttpError, SnapsPublicClient, SupportMessage, SupportSession } from '../../api/snaps-client';
 import { MarkdownRenderer } from '../shared';
+import { detectEnvironment } from '../BugReportForm/EnvironmentDetector';
 
-export interface SupportChatProps { projectId: string; apiKey: string; apiUrl?: string; sessionUserRef?: string; sessionKey?: string; onCreated: (card: SnapsCard) => void; }
+export interface SupportChatProps { projectId: string; apiKey: string; apiUrl?: string; appName?: string; sessionUserRef?: string; sessionKey?: string; onCreated: (card: SnapsCard) => void; }
 type Message = RecentMessage & { id: string; incomplete?: boolean; attachments?: AttachmentResponse[] };
 type Upload = { id: string; file: File; response?: AttachmentResponse; error?: boolean; loading: boolean };
 export function SupportChat(props: SupportChatProps) {
   return <ChatSession key={JSON.stringify([props.projectId, props.apiKey, props.apiUrl, props.sessionUserRef, props.sessionKey])} {...props} />;
 }
-function ChatSession({ projectId, apiKey, apiUrl, sessionUserRef, onCreated }: SupportChatProps) {
+function ChatSession({ projectId, apiKey, apiUrl, appName, sessionUserRef, onCreated }: SupportChatProps) {
   const client = useMemo(() => new SnapsPublicClient({ projectId, apiKey, apiUrl }), [projectId, apiKey, apiUrl]);
   const [entry, setEntry] = useState(0); const [ready, setReady] = useState(false); const [expired, setExpired] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]); const [text, setText] = useState('');
@@ -87,7 +88,8 @@ function ChatSession({ projectId, apiKey, apiUrl, sessionUserRef, onCreated }: S
   const send = (e: React.FormEvent) => {
     e.preventDefault(); if (!text.trim() || !ready || running.current || uploads.some(u => !u.response)) return;
     const assistantId = crypto.randomUUID();
-    const request = { assistantId, payload: { client_message_id: crypto.randomUUID(), text: text.trim(), context: recentContext(messages), attachment_ids: uploads.map(u => u.response!.attachment_id) } };
+    const technical = messages.length ? '' : '\n\nDados do aplicativo (informados pelo navegador): ' + JSON.stringify({ application: appName || null, ...detectEnvironment() });
+    const request = { assistantId, payload: { client_message_id: crypto.randomUUID(), text: text.trim().slice(0, 7000) + technical, context: recentContext(messages), attachment_ids: uploads.map(u => u.response!.attachment_id) } };
     pending.current = request;
     setMessages(m => [...m, { id: request.payload.client_message_id, role: 'user', content: text.trim(), attachments: uploads.map(u => u.response!) }, { id: assistantId, role: 'assistant', content: '' }]);
     setText(''); setUploads([]); void run(request);
@@ -107,16 +109,17 @@ function ChatSession({ projectId, apiKey, apiUrl, sessionUserRef, onCreated }: S
   };
   return <section aria-label="Chat de suporte" className="snaps-chat space-y-4 border rounded-xl p-4">
     <h2 className="text-lg font-bold">Converse com o suporte</h2>
-    <p className="text-sm">Esta conversa é temporária. Ao sair ou trocar de usuário, uma nova conversa começa vazia. Os formulários continuam disponíveis.</p>
+    <p className="text-sm">Conte o que aconteceu ou sua ideia de melhoria. Vou reunir os dados do chamado e mostrar tudo para você revisar antes de enviar.</p>
+    <p className="text-sm">Ao encerrar, esta conversa é apagada. O chamado confirmado permanece disponível na lista.</p>
     <div role="log" aria-label="Mensagens da conversa" aria-live="polite" className="space-y-3">{messages.map(m => <div key={m.id} className="rounded border p-3"><strong>{m.role === 'user' ? 'Você' : 'Suporte'}</strong><MarkdownRenderer content={m.content} />{m.attachments?.map(a => <img key={a.attachment_id} src={a.url} alt="Imagem enviada nesta conversa" className="max-w-full" width={200} />)}{m.incomplete && <span>Resposta incompleta</span>}</div>)}</div>
     {error && <p role="alert">{error}</p>}
     {expired && <p role="status">Conversa expirada. Inicie uma nova conversa para continuar.</p>}
     {!ready && !error && !expired && <p role="status">Iniciando conversa...</p>}
     {(!ready || created) && <button type="button" className="snaps-button" onClick={() => setEntry(v => v + 1)}>Nova conversa</button>}
-    {proposal && !created && <section aria-label="Proposta de chamado" className="border rounded p-4 space-y-3"><h3>{proposal.proposal.title}</h3><MarkdownRenderer content={proposal.proposal.description} /><p>Revise a proposta antes de criar o chamado.</p><button type="button" className="snaps-button" disabled={busy} onClick={() => { void confirm(); }}>Confirmar criação</button></section>}
+    {proposal && !created && <section aria-label="Proposta de chamado" className="border rounded p-4 space-y-3"><h3>{proposal.proposal.title}</h3><p>{proposal.proposal.card_type === 'bug' ? 'Relato de bug' : 'Sugestão de melhoria'}</p><TicketFields proposal={proposal} /><MarkdownRenderer content={proposal.proposal.description} /><p>Revise os campos. Para corrigir algum dado, envie uma mensagem antes de confirmar.</p><button type="button" className="snaps-button" disabled={busy} onClick={() => { void confirm(); }}>Confirmar criação</button></section>}
     {created && <p role="status">Chamado criado: {created.code || created.id} — {created.title}</p>}
     {ready && !created && <form onSubmit={send} className="space-y-3">
-      <label className="block">Mensagem<textarea aria-label="Mensagem" maxLength={8000} value={text} onChange={e => setText(e.target.value)} rows={3} className="w-full border rounded p-2" /></label>
+      <label className="block">Mensagem<textarea aria-label="Mensagem" maxLength={7000} value={text} onChange={e => setText(e.target.value)} rows={3} className="w-full border rounded p-2" /></label>
       <label className="block">Anexar imagens<input type="file" aria-label="Anexar imagens" multiple accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={e => { chooseImages(e.target.files); e.target.value = ''; }} /></label>
       <p className="text-sm">Até 4 imagens de 5 MiB. As imagens anexadas usam URLs públicas de evidência.</p>
       <ul>{uploads.map(u => <li key={u.id} className="flex items-center gap-2"><ImagePreview file={u.file} /><span>{u.file.name} {u.loading ? 'Enviando...' : u.error ? 'Falha no upload' : 'Pronta'}</span>{u.error && <button type="button" className="snaps-button" onClick={() => { void upload(u); }}>Tentar upload novamente</button>}<button type="button" disabled={busy || u.loading} onClick={() => setUploads(all => all.filter(x => x.id !== u.id))}>Remover {u.file.name}</button></li>)}</ul>
@@ -126,6 +129,13 @@ function ChatSession({ projectId, apiKey, apiUrl, sessionUserRef, onCreated }: S
       </div>
     </form>}
   </section>;
+}
+function TicketFields({ proposal }: { proposal: ProposalEvent }) {
+  const metadata = proposal.proposal.card_metadata;
+  if (!metadata) return null;
+  const labels: Record<string, string> = { application: 'Aplicação', module: 'Módulo / tela', actual_behavior: 'O que aconteceu', expected_behavior: 'O que deveria acontecer', steps_to_reproduce: 'Passos para reproduzir', severity: 'Severidade', frequency: 'Frequência', users_affected: 'Usuários afetados', blocks_critical_flow: 'Bloqueia fluxo crítico', has_workaround: 'Existe alternativa', workaround_description: 'Descrição da alternativa', problem_or_opportunity: 'Dor / oportunidade', proposed_solution: 'Solução proposta', expected_impact: 'Impacto esperado', priority_justification: 'Justificativa', browser: 'Navegador', os: 'Sistema operacional', screen_resolution: 'Resolução', app_version: 'Versão do app' };
+  const values: Record<string, string> = { low: 'Baixa', medium: 'Média', high: 'Alta', critical: 'Crítica', always: 'Sempre', sometimes: 'Às vezes', once: 'Uma vez', unknown: 'Não informado', single: 'Só comigo', few: 'Poucos', many: 'Muitos', all: 'Todos' };
+  return <dl className="snaps-ticket-fields">{Object.entries(metadata).filter(([key]) => labels[key]).map(([key, value]) => <div key={key}><dt>{labels[key]}</dt><dd>{typeof value === 'boolean' ? (value ? 'Sim' : 'Não') : values[String(value)] || String(value || 'Não informado')}</dd></div>)}</dl>;
 }
 function ImagePreview({ file }: { file: File }) {
   const [url, setUrl] = useState('');

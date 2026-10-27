@@ -9,6 +9,8 @@ export interface SupportEditFormProps {
   onSuccess?: (card: SnapsCard) => void; onCancel?: () => void;
 }
 const fields: [keyof CardMetadata, string, 'text' | 'boolean'][] = [
+  ['application', 'Aplicação', 'text'], ['module', 'Módulo / tela', 'text'],
+  ['actual_behavior', 'O que aconteceu', 'text'], ['expected_behavior', 'O que deveria acontecer', 'text'], ['steps_to_reproduce', 'Passos para reproduzir', 'text'],
   ['severity', 'Severidade', 'text'], ['frequency', 'Frequência', 'text'], ['users_affected', 'Usuários afetados', 'text'],
   ['blocks_critical_flow', 'Bloqueia fluxo crítico', 'boolean'], ['has_workaround', 'Existe alternativa', 'boolean'],
   ['workaround_description', 'Descrição da alternativa', 'text'], ['problem_or_opportunity', 'Dor / oportunidade', 'text'],

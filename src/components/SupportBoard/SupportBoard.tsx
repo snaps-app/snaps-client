@@ -3,7 +3,7 @@ import { SnapsCard, SnapsPublicClient, SupportListResponse } from '../../api/sna
 import { CardRow } from './CardRow';
 import { CardDetailModal } from './CardDetailModal';
 import { CreateCardModal } from './CreateCardModal';
-import { SupportChat } from './SupportChat';
+import { FloatingSupport } from './FloatingSupport';
 import { SearchInput, Pagination, toast } from '../shared';
 import { AlertCircle, Bug, Lightbulb, Loader2, Plus, RefreshCw } from 'lucide-react';
 
@@ -32,7 +32,6 @@ function SupportView({
   sessionKey,
 }: SupportBoardProps) {
   const [activeTab, setActiveTab] = useState<'active' | 'history'>(defaultTab);
-  const [chatOpen, setChatOpen] = useState(false);
   const requestGeneration = useRef(0);
 
   // Pagination States
@@ -163,8 +162,7 @@ function SupportView({
 
   return (
     <div className="space-y-6 w-full mx-auto">
-      <button type="button" className="snaps-button" onClick={() => setChatOpen(v => !v)}>{chatOpen ? 'Encerrar conversa' : 'Conversar com o suporte'}</button>
-      {chatOpen && <SupportChat projectId={projectId} apiKey={apiKey} apiUrl={apiUrl} sessionUserRef={sessionUserRef} sessionKey={sessionKey} onCreated={() => { fetchTickets(activeTab); }} />}
+      <FloatingSupport projectId={projectId} apiKey={apiKey} apiUrl={apiUrl} appName={appName} sessionUserRef={sessionUserRef} sessionKey={sessionKey} onCreated={() => { fetchTickets(activeTab); }} />
       {/* Header controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border shadow-sm">
         <div className="flex gap-2">

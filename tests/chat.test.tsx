@@ -5,6 +5,30 @@ import { SupportChat } from '../src/components/SupportBoard/SupportChat';
 import { SnapsPublicClient } from '../src/api/snaps-client';
 import { readSupportEvents, recentContext } from '../src/api/support-chat';
 import { SnapsHttpError } from '../src/api/snaps-client';
+import { FloatingSupport } from '../src/components/SupportBoard/FloatingSupport';
+
+it('opens the floating lightning only on demand, closes on Escape and starts a fresh session', async () => {
+  const create = vi.spyOn(SnapsPublicClient.prototype, 'createSupportSession').mockResolvedValue({ chat_id: 'A', session_token: 't', expires_at: '2030-01-01' });
+  const close = vi.spyOn(SnapsPublicClient.prototype, 'closeSupportSession').mockResolvedValue();
+  render(<FloatingSupport projectId="p" apiKey="key" onCreated={vi.fn()} />);
+  const launcher = screen.getByRole('button', { name: 'Abrir suporte Snaps' });
+  expect(create).not.toHaveBeenCalled(); expect(screen.queryByRole('dialog')).toBeNull();
+  fireEvent.click(launcher); await screen.findByLabelText('Mensagem');
+  fireEvent.change(screen.getByLabelText('Mensagem'), { target: { value: 'Rascunho privado' } });
+  fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+  expect(close).toHaveBeenCalledTimes(1); expect(screen.queryByRole('dialog')).toBeNull(); expect(document.activeElement).toBe(launcher);
+  fireEvent.click(launcher); await screen.findByLabelText('Mensagem');
+  expect((screen.getByLabelText('Mensagem') as HTMLTextAreaElement).value).toBe(''); expect(create).toHaveBeenCalledTimes(2);
+});
+
+it('keeps only allowed ticket fields when parsing a proposal', async () => {
+  const events: unknown[] = [];
+  const frame = { type: 'proposal', hash: 'a'.repeat(64), version: 1, proposal: { title: 'Ticket', description: 'Notas', card_type: 'bug', attachment_ids: [], card_metadata: { application: 'Admin', actual_behavior: 'Erro', blocks_critical_flow: false, internal_secret: 'do not expose' } } };
+  const bytes = new TextEncoder().encode('data: ' + JSON.stringify(frame) + '\n\ndata: {"type":"done","incompleto":false}\n\n');
+  await readSupportEvents(new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } }), e => events.push(e));
+  expect(events[0]).toMatchObject({ proposal: { card_metadata: { application: 'Admin', actual_behavior: 'Erro', blocks_critical_flow: false } } });
+  expect(JSON.stringify(events)).not.toContain('internal_secret');
+});
 
 it('parses fragmented UTF-8 SSE and exposes only public fields', async () => {
   const raw = new TextEncoder().encode('data: {"type":"thinking","content":"secret"}\r\n\r\ndata: {"type":"token","content":"Olá","private":"secret"}\r\n\r\ndata: {"type":"done","incompleto":false}\n\n');

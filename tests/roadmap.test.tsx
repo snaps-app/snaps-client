@@ -19,7 +19,10 @@ it('ignores an old project response and retains filters in an empty result', asy
   view.rerender(<RoadmapBoard projectId="new" apiKey="key" showBacklog={false} />);
   await screen.findByText('Nenhuma sprint neste filtro.');
   old(page('stale')); await waitFor(() => expect(screen.queryByText('stale')).toBeNull());
-  fireEvent.click(screen.getByRole('button', { name: 'Concluídas' }));
+  expect(screen.queryByRole('button', { name: 'Concluídas' })).toBeNull();
+  expect(screen.getByText('Filtrar sprints').closest('details')!.open).toBe(false);
+  fireEvent.click(screen.getByText('Filtrar sprints')); screen.getByText('Filtrar sprints').closest('details')!.open = true;
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Concluídas' }));
   await waitFor(() => expect(f).toHaveBeenLastCalledWith(expect.objectContaining({ sprintStatus: ['done'], offset: 0 }), expect.any(AbortSignal)));
 });
 it('loads more without duplicate sprint IDs and retries a failed page', async () => {

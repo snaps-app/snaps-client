@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { CostPeriod, DecimalValue, LlmCostsResponse, LlmSummary, SnapsPublicClient } from '../../api/snaps-client';
+import { Metric } from './CostsBoard';
 export function usd(value: DecimalValue | null) { return value === null ? 'Desconhecido' : `USD ${Number(value).toFixed(8)}`; }
 function Summary({ data }: { data: LlmSummary }) {
-  return <dl className="grid gap-2 md:grid-cols-2">
-    <div><dt>Total factual</dt><dd>{data.usage_count === 0 ? 'Sem uso registrado' : data.total_cost_usd === null ? 'Total factual indisponível' : usd(data.total_cost_usd)}</dd></div>
-    <div><dt>Soma conhecida (cobertura {data.coverage === 'complete' ? 'completa' : data.coverage === 'partial' ? 'parcial' : 'ausente'})</dt><dd>{usd(data.known_cost_usd)}</dd></div>
-    <div><dt>Estimativa não faturável</dt><dd>{usd(data.estimated_cost_usd)}</dd></div>
-    <div><dt>Usos desconhecidos / pendentes</dt><dd>{data.unknown_count} / {data.pending_count}</dd></div>
+  return <dl className="snaps-metrics snaps-ai-metrics">
+    <Metric label="Custo total (USD)" value={data.usage_count === 0 ? 'Sem uso registrado' : data.total_cost_usd === null ? 'Total factual indisponível' : usd(data.total_cost_usd)} detail={data.coverage === 'complete' ? 'Cobertura completa' : 'Cobertura incompleta — confira os valores conhecidos'} />
+    <Metric label="Soma conhecida" value={usd(data.known_cost_usd)} detail={'Cobertura ' + (data.coverage === 'complete' ? 'completa' : data.coverage === 'partial' ? 'parcial' : 'ausente')} />
+    <Metric label="Chamadas de IA" value={data.usage_count.toLocaleString('pt-BR')} detail={`${data.unknown_count} com custo desconhecido · ${data.pending_count} pendentes`} />
+    <Metric label="Estimativa não faturável" value={usd(data.estimated_cost_usd)} detail="Apresentada separadamente do custo confirmado" />
   </dl>;
 }
 export function LlmCosts({ client, period }: { client: SnapsPublicClient; period: CostPeriod }) {
@@ -18,7 +19,7 @@ export function LlmCosts({ client, period }: { client: SnapsPublicClient; period
     return () => { live = false; abort.abort(); };
   }, [client, period.startDate, period.endDate, conversationId, retry]);
   return <section aria-label="IA do suporte" className="space-y-4"><h3 className="text-lg font-bold">IA do suporte — projeto inteiro no período (USD)</h3>
-    <p>O filtro de pessoa afeta somente as horas. Custos de IA já incluem o valor calculado pelo servidor.</p>
+    <p>Consumo de todas as conversas de suporte do projeto. O colaborador selecionado na aba Tempo não altera estes valores.</p>
     <label>Conversa (somente IA)<select aria-label="Conversa (somente IA)" value={conversationId} onChange={e => setConversationId(e.target.value)}><option value="">Todas as conversas</option>{conversations.map(c => <option key={c} value={c}>{c}</option>)}</select></label>
     {conversationId && <p>Exibindo apenas a conversa selecionada. O relatório PDF mantém IA do projeto inteiro.</p>}
     {busy ? <p role="status">Carregando IA...</p> : error ? <p role="alert">Não foi possível carregar IA. <button type="button" className="snaps-button" onClick={() => setRetry(r => r + 1)}>Tentar novamente IA</button></p> : data && <>
