@@ -245,6 +245,13 @@ export interface FileUploadZoneProps {
 }
 
 export function FileUploadZone({ files, onFilesChange }: FileUploadZoneProps) {
+  const [error, setError] = React.useState('');
+  const appendFiles = (added: File[]) => {
+    if (files.length + added.length > 4 || added.some(file => !['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size <= 0 || file.size > 5 * 1024 * 1024)) {
+      setError('Envie até 4 imagens PNG, JPEG ou WebP de até 5 MiB cada.'); return;
+    }
+    setError(''); onFilesChange([...files, ...added]);
+  };
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
@@ -253,14 +260,14 @@ export function FileUploadZone({ files, onFilesChange }: FileUploadZoneProps) {
     e.preventDefault();
     if (e.dataTransfer.files) {
       const newFiles = Array.from(e.dataTransfer.files);
-      onFilesChange([...files, ...newFiles]);
+      appendFiles(newFiles);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
-      onFilesChange([...files, ...newFiles]);
+      appendFiles(newFiles);
     }
   };
 
@@ -279,6 +286,8 @@ export function FileUploadZone({ files, onFilesChange }: FileUploadZoneProps) {
       >
         <input
           type="file"
+          aria-label="Anexar evidências"
+          accept="image/png,image/jpeg,image/webp"
           multiple
           onChange={handleFileChange}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -286,20 +295,20 @@ export function FileUploadZone({ files, onFilesChange }: FileUploadZoneProps) {
         <div className="flex flex-col items-center gap-1.5 text-slate-500">
           <UploadCloud className="w-8 h-8 text-slate-400" />
           <span className="text-xs font-medium">Arraste e solte arquivos aqui, ou clique para fazer upload</span>
-          <span className="text-[10px] text-slate-400">Suporta imagens, PDFs, vídeos ou logs</span>
+          <span className="text-[10px] text-slate-400">Até 4 imagens PNG, JPEG ou WebP, de até 5 MiB cada</span>
         </div>
       </div>
 
+      {error && <p role="alert">{error}</p>}
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {files.map((file, idx) => {
             const isImg = file.type.startsWith('image/');
-            const previewUrl = isImg ? URL.createObjectURL(file) : null;
 
             return (
               <div key={idx} className="relative group border rounded p-1.5 flex items-center gap-2 bg-slate-50 max-w-xs pr-8">
-                {isImg && previewUrl ? (
-                  <img src={previewUrl} alt={file.name} className="w-8 h-8 rounded object-cover border" />
+                {isImg ? (
+                  <FilePreview file={file} />
                 ) : (
                   <Paperclip className="w-4 h-4 text-slate-400 shrink-0" />
                 )}
@@ -321,6 +330,12 @@ export function FileUploadZone({ files, onFilesChange }: FileUploadZoneProps) {
       )}
     </div>
   );
+}
+
+function FilePreview({ file }: { file: File }) {
+  const [url, setUrl] = React.useState('');
+  React.useEffect(() => { const value = URL.createObjectURL(file); setUrl(value); return () => URL.revokeObjectURL(value); }, [file]);
+  return url ? <img src={url} alt={file.name} className="w-8 h-8 rounded object-cover border" /> : null;
 }
 
 // === Toast ===
