@@ -4,7 +4,7 @@ export interface RecentMessage { role: 'user' | 'assistant'; content: string; }
 export interface SupportMessage { client_message_id: string; text: string; context: RecentMessage[]; attachment_ids: string[]; }
 export interface SupportProposal { title: string; description: string; card_type: 'bug' | 'improvement'; attachment_ids: string[]; card_metadata?: CardMetadata; }
 export type ProposalEvent = { type: 'proposal'; proposal: SupportProposal; hash: string; version: number };
-export type SupportEvent = { type: 'token'; content: string } | { type: 'done'; incompleto: boolean } | { type: 'error'; message: string } | { type: 'guardrail_tripped'; message: string } | ProposalEvent;
+export type SupportEvent = { type: 'thinking' | 'tool_start' | 'tool_end' } | { type: 'token'; content: string } | { type: 'done'; incompleto: boolean } | { type: 'error'; message: string } | { type: 'guardrail_tripped'; message: string } | ProposalEvent;
 export interface AttachmentResponse { url: string; attachment_id: string; mime_type: string; size_bytes: number; }
 
 export function recentContext(messages: RecentMessage[]): RecentMessage[] {
@@ -19,6 +19,7 @@ export function recentContext(messages: RecentMessage[]): RecentMessage[] {
 function publicEvent(value: unknown): SupportEvent | null {
   if (!value || typeof value !== 'object') return null;
   const v = value as Record<string, unknown>;
+  if (v.type === 'thinking' || v.type === 'tool_start' || v.type === 'tool_end') return { type: v.type };
   if (v.type === 'token' && typeof v.content === 'string') return { type: 'token', content: v.content };
   if (v.type === 'done') return { type: 'done', incompleto: Boolean(v.incompleto) };
   if (v.type === 'error') return { type: 'error', message: 'Não foi possível concluir. Tente novamente.' };

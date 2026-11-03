@@ -8,6 +8,7 @@ const repoSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' })
 function walk(dir) { return readdirSync(dir, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)]); }
 const files = walk('dist').filter(path => !path.endsWith('manifest.json')).sort().map(path => {
   const bytes = readFileSync(path);
+  if (/snaps-client\.(umd|es)\.js$/.test(path) && !bytes.toString('utf8').startsWith(`/*! @snaps/client v${version} */`)) throw new Error(`Missing version banner in ${path}`);
   if (/DATABASE_URL|tzcuhimetnxurvpysybf\.supabase\.co/.test(bytes.toString('utf8'))) throw new Error(`Forbidden backend configuration in ${path}`);
   return { path: relative('dist', path).replaceAll('\\', '/'), bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') };
 });

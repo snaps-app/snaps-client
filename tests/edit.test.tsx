@@ -11,9 +11,13 @@ it.each(['bug', 'feature'])('preserves legacy description, metadata and existing
   const refresh = vi.fn();
   render(<CardDetailModal card={{ ...card, card_type: type }} projectId="p" apiKey="key" onClose={vi.fn()} onRefresh={refresh} />);
   fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
-  fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Corrigido' } });
+  expect(screen.getAllByRole('textbox')).toHaveLength(1);
+  expect(screen.getByLabelText('Descrição')).toHaveValue(card.description);
+  expect(screen.queryByText('Campos do formulário')).toBeNull();
+  expect(screen.queryByLabelText('Anexar evidências')).toBeNull();
+  fireEvent.change(screen.getByLabelText('Descrição'), { target: { value: 'Corrigido' } });
   fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
-  await waitFor(() => expect(save).toHaveBeenCalledWith('c', { title: 'Corrigido', description: card.description, card_metadata: {} }));
+  await waitFor(() => expect(save).toHaveBeenCalledWith('c', { description: 'Corrigido' }));
   expect(upload).not.toHaveBeenCalled(); expect(refresh).toHaveBeenCalled();
 });
 it('keeps the draft on a concurrent 409 and removes internal actions', async () => {
@@ -21,9 +25,9 @@ it('keeps the draft on a concurrent 409 and removes internal actions', async () 
   render(<CardDetailModal card={card} projectId="p" apiKey="key" onClose={vi.fn()} onRefresh={vi.fn()} />);
   expect(screen.queryByText('Alterar Status')).toBeNull(); expect(screen.queryByTitle('Excluir chamado')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
-  fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Rascunho' } });
+  fireEvent.change(screen.getByLabelText('Descrição'), { target: { value: 'Rascunho' } });
   fireEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
-  await screen.findByRole('alert'); expect((screen.getByLabelText('Título') as HTMLInputElement).value).toBe('Rascunho');
+  await screen.findByRole('alert'); expect((screen.getByLabelText('Descrição') as HTMLInputElement).value).toBe('Rascunho');
 });
 it('hides Editar after triage', () => {
   render(<CardDetailModal card={{ ...card, status: 'triaging' }} projectId="p" apiKey="key" onClose={vi.fn()} onRefresh={vi.fn()} />);

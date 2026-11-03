@@ -14,8 +14,8 @@ export default defineConfig({
       formats: ['umd', 'es'],
       fileName: (format) => `snaps-client.${format}.js`,
     },
-    rollupOptions: {
-      // React is bundled internally — no externals
+    rolldownOptions: {
+      output: { postBanner: `/*! @snaps/client v${version} */` },
     },
     cssCodeSplit: false, // Single CSS file
   },
