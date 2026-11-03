@@ -5,7 +5,8 @@ import { CardDetailModal } from './CardDetailModal';
 import { CreateCardModal } from './CreateCardModal';
 import { FloatingSupport } from './FloatingSupport';
 import { SearchInput, Pagination, toast } from '../shared';
-import { AlertCircle, Bug, Lightbulb, Loader2, Plus, RefreshCw } from 'lucide-react';
+import { AlertCircle, Bug, Lightbulb, Plus, RefreshCw } from 'lucide-react';
+import { BoardLoading } from '../shared/BoardLoading';
 
 export interface SupportBoardProps {
   sessionUserRef?: string;
@@ -258,10 +259,7 @@ function SupportView({
       {/* Ticket List */}
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden min-h-[250px] flex flex-col justify-between">
         {isLoading ? (
-          <div className="flex-1 flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
-            <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
-            <span className="text-sm font-medium">Carregando chamados...</span>
-          </div>
+          <BoardLoading>Carregando chamados...</BoardLoading>
         ) : error ? (
           <div className="flex-1 flex flex-col items-center justify-center py-12 text-red-500 gap-2">
             <AlertCircle className="w-8 h-8" />

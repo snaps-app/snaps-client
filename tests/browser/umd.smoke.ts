@@ -69,12 +69,16 @@ it('loads standalone UMD, versions six Shadow DOM hosts and confirms an ephemera
   try {
     await page.locator('snaps-costs-board').getByRole('tab', { name: 'IA de suporte' }).click();
     await page.locator('snaps-costs-board').getByText('USD 0.00000000', { exact: true }).first().waitFor();
-    expect(await page.evaluate(() => { const api = (window as unknown as { SnapsClient: { version: string; registerAll: () => void } }).SnapsClient; api.registerAll(); api.registerAll(); return api.version; })).toBe('0.2.0');
-    expect(await page.locator('[data-snaps-version="0.2.0"]').count()).toBe(6);
+    expect(await page.evaluate(() => { const api = (window as unknown as { SnapsClient: { version: string; registerAll: () => void } }).SnapsClient; api.registerAll(); api.registerAll(); return api.version; })).toBe('0.2.1');
+    expect(await page.locator('[data-snaps-version="0.2.1"]').count()).toBe(6);
     expect(await page.evaluate(() => [...document.querySelectorAll('[data-snaps-version]')].every(h => Boolean(h.shadowRoot?.querySelector('style')?.textContent?.includes('--snaps-primary'))))).toBe(true);
     expect(await page.locator('snaps-costs-board').getByRole('button', { name: 'Aplicar período' }).evaluate(el => getComputedStyle(el).fontSize)).not.toBe('40px');
     const support = page.locator('snaps-support-board'); await support.getByRole('button', { name: 'Abrir suporte Snaps' }).click();
-    await support.getByLabel('Anexar imagens', { exact: true }).setInputFiles({ name: 'evidence.png', mimeType: 'image/png', buffer: png });
+    await support.getByLabel('Mensagem', { exact: true }).evaluate((textarea, bytes) => {
+      const clipboard = new DataTransfer(); clipboard.items.add(new File([new Uint8Array(bytes)], 'evidence.png', { type: 'image/png' }));
+      textarea.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: clipboard }));
+    }, [...png]);
+    await support.getByAltText('Prévia de evidence.png').waitFor();
     await support.getByRole('button', { name: 'Tentar upload novamente' }).click();
     await support.getByText('evidence.png Pronta', { exact: true }).waitFor();
     await support.getByLabel('Mensagem', { exact: true }).fill('Relato desta sessão'); await support.getByRole('button', { name: 'Enviar', exact: true }).click();

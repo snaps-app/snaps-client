@@ -34,7 +34,7 @@ it('parses fragmented UTF-8 SSE and exposes only public fields', async () => {
   const raw = new TextEncoder().encode('data: {"type":"thinking","content":"secret"}\r\n\r\ndata: {"type":"token","content":"Olá","private":"secret"}\r\n\r\ndata: {"type":"done","incompleto":false}\n\n');
   const events: unknown[] = [];
   await readSupportEvents(new ReadableStream({ start(c) { for (const b of raw) c.enqueue(new Uint8Array([b])); c.close(); } }), e => events.push(e));
-  expect(events).toEqual([{ type: 'token', content: 'Olá' }, { type: 'done', incompleto: false }]);
+  expect(events).toEqual([{ type: 'thinking' }, { type: 'token', content: 'Olá' }, { type: 'done', incompleto: false }]);
 });
 it('bounds only current user/assistant text to 12 messages and 16000 chars', () => {
   const context = recentContext(Array.from({ length: 30 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: 'x'.repeat(5000) })) as never);

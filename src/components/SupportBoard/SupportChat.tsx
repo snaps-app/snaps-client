@@ -2,28 +2,39 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AttachmentResponse, ProposalEvent, recentContext, RecentMessage, SnapsCard, SnapsHttpError, SnapsPublicClient, SupportMessage, SupportSession } from '../../api/snaps-client';
 import { MarkdownRenderer } from '../shared';
 import { detectEnvironment } from '../BugReportForm/EnvironmentDetector';
+import { Loader2 } from 'lucide-react';
 
-export interface SupportChatProps { projectId: string; apiKey: string; apiUrl?: string; appName?: string; sessionUserRef?: string; sessionKey?: string; onCreated: (card: SnapsCard) => void; }
+export interface SupportChatProps { projectId: string; apiKey: string; apiUrl?: string; appName?: string; sessionUserRef?: string; sessionKey?: string; onCreated: (card: SnapsCard) => void; onProcessingChange?: (processing: boolean) => void; }
 type Message = RecentMessage & { id: string; incomplete?: boolean; attachments?: AttachmentResponse[] };
 type Upload = { id: string; file: File; response?: AttachmentResponse; error?: boolean; loading: boolean };
+type Request = { payload: SupportMessage; assistantId: string; retryAsNew?: boolean };
+type Stage = 'Enviando' | 'Pensando' | 'Consultando' | 'Escrevendo';
 export function SupportChat(props: SupportChatProps) {
   return <ChatSession key={JSON.stringify([props.projectId, props.apiKey, props.apiUrl, props.sessionUserRef, props.sessionKey])} {...props} />;
 }
-function ChatSession({ projectId, apiKey, apiUrl, appName, sessionUserRef, onCreated }: SupportChatProps) {
+function ChatSession({ projectId, apiKey, apiUrl, appName, sessionUserRef, onCreated, onProcessingChange }: SupportChatProps) {
   const client = useMemo(() => new SnapsPublicClient({ projectId, apiKey, apiUrl }), [projectId, apiKey, apiUrl]);
   const [entry, setEntry] = useState(0); const [ready, setReady] = useState(false); const [expired, setExpired] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]); const [text, setText] = useState('');
-  const [uploads, setUploads] = useState<Upload[]>([]); const [proposal, setProposal] = useState<ProposalEvent | null>(null);
+  const [uploads, renderUploads] = useState<Upload[]>([]); const [proposal, setProposal] = useState<ProposalEvent | null>(null);
+  const uploadItems = useRef<Upload[]>([]);
+  const setUploads = (update: React.SetStateAction<Upload[]>) => {
+    uploadItems.current = typeof update === 'function' ? update(uploadItems.current) : update;
+    renderUploads(uploadItems.current);
+  };
+  const [stage, setStage] = useState<Stage>('Enviando');
   const [created, setCreated] = useState<SnapsCard | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const session = useRef<SupportSession | null>(null); const active = useRef(false); const running = useRef(false);
   const stream = useRef<AbortController | null>(null); const uploadControllers = useRef(new Set<AbortController>());
-  const pending = useRef<{ payload: SupportMessage; assistantId: string } | null>(null);
+  const pending = useRef<Request | null>(null);
+  const uploadingIds = useRef(new Set<string>());
+  const notifyProcessing = () => onProcessingChange?.(running.current || uploadControllers.current.size > 0);
   const [lastActivity, setLastActivity] = useState(Date.now());
   const clear = () => { setMessages([]); setText(''); setUploads([]); setProposal(null); setCreated(null); pending.current = null; };
   const expire = () => {
     stream.current?.abort(); uploadControllers.current.forEach(c => c.abort());
     const old = session.current; session.current = null; if (old) void client.closeSupportSession(old).catch(() => {});
-    clear(); setReady(false); setExpired(true); setBusy(false); running.current = false;
+    clear(); setReady(false); setExpired(true); setBusy(false); running.current = false; onProcessingChange?.(false);
   };
   useEffect(() => {
     active.current = true; let live = true; let own: SupportSession | null = null;
@@ -49,44 +60,60 @@ function ChatSession({ projectId, apiKey, apiUrl, appName, sessionUserRef, onCre
   }, [ready, lastActivity]);
 
   const upload = async (item: Upload) => {
+    if (running.current || uploadingIds.current.has(item.id)) return;
+    uploadingIds.current.add(item.id);
     const controller = new AbortController(); uploadControllers.current.add(controller);
+    notifyProcessing();
     setUploads(u => u.map(x => x.id === item.id ? { ...x, loading: true, error: false } : x));
     try {
       const response = await client.uploadAttachment(item.file, controller.signal);
       if (active.current && !controller.signal.aborted) setUploads(u => u.map(x => x.id === item.id ? { ...x, response, loading: false } : x));
     } catch { if (active.current && !controller.signal.aborted) setUploads(u => u.map(x => x.id === item.id ? { ...x, loading: false, error: true } : x)); }
-    finally { uploadControllers.current.delete(controller); }
+    finally { uploadControllers.current.delete(controller); uploadingIds.current.delete(item.id); if (active.current) notifyProcessing(); }
   };
-  const chooseImages = (files: FileList | null) => {
-    if (!files) return;
-    if (uploads.length + files.length > 4 || Array.from(files).some(f => !['image/png', 'image/jpeg', 'image/webp'].includes(f.type) || f.size > 5 * 1024 * 1024 || f.size === 0)) {
+  const chooseImages = (files: FileList | File[] | null) => {
+    if (!files?.length || running.current) return;
+    if (uploadItems.current.length + files.length > 4 || Array.from(files).some(f => !['image/png', 'image/jpeg', 'image/webp'].includes(f.type) || f.size > 5 * 1024 * 1024 || f.size === 0)) {
       setError('Envie até 4 imagens PNG, JPEG ou WebP de até 5 MiB cada.'); return;
     }
     const next = Array.from(files).map(file => ({ id: crypto.randomUUID(), file, loading: true }));
     setError(''); setUploads(u => [...u, ...next]); next.forEach(item => { void upload(item); });
   };
-  const run = async (request: { payload: SupportMessage; assistantId: string }) => {
+  const run = async (request: Request) => {
     const current = session.current; if (!current || running.current) return;
-    running.current = true; setBusy(true); setError(''); setProposal(null);
+    running.current = true; notifyProcessing(); setBusy(true); setStage('Enviando'); setError(''); setProposal(null);
     const controller = new AbortController(); stream.current = controller; setLastActivity(Date.now());
+    let complete = false; let failed = false; let receivedText = false;
     try {
       await client.sendSupportMessage(current, request.payload, event => {
-        if (!active.current || controller.signal.aborted) return;
-        if (event.type === 'token') setMessages(all => all.map(m => m.id === request.assistantId ? { ...m, content: m.content + event.content } : m));
+        if (!active.current || controller.signal.aborted || session.current !== current || stream.current !== controller) return;
+        if (event.type === 'thinking' || event.type === 'tool_end') setStage('Pensando');
+        if (event.type === 'tool_start') setStage('Consultando');
+        if (event.type === 'token') {
+          setStage('Escrevendo');
+          const first = !receivedText; receivedText = true;
+          setMessages(all => all.map(m => m.id === request.assistantId ? { ...m, content: (first ? '' : m.content) + event.content } : m));
+        }
         if (event.type === 'proposal') setProposal(event);
-        if (event.type === 'error' || event.type === 'guardrail_tripped') setError(event.message);
-        if (event.type === 'done') setMessages(all => all.map(m => m.id === request.assistantId ? { ...m, incomplete: event.incompleto } : m));
+        if (event.type === 'error' || event.type === 'guardrail_tripped') { failed = true; setError(event.message); }
+        if (event.type === 'done') {
+          complete = !event.incompleto && !failed;
+          // A completed receipt is replay-only. A deliberate resend needs a new
+          // message ID, retaining the original attachment references and UI row.
+          request.retryAsNew = !complete;
+          setMessages(all => all.map(m => m.id === request.assistantId ? { ...m, incomplete: !complete } : m));
+        }
       }, controller.signal);
-      if (!controller.signal.aborted) pending.current = null;
+      if (!controller.signal.aborted && complete) pending.current = null;
     } catch (e) {
       if (!active.current || session.current !== current) return;
       if (e instanceof SnapsHttpError && [401, 403, 410].includes(e.status)) { expire(); return; }
       setMessages(all => all.map(m => m.id === request.assistantId ? { ...m, incomplete: true } : m));
       setError(controller.signal.aborted ? 'Resposta cancelada. O texto parcial permanece apenas nesta conversa.' : 'Resposta interrompida. Você pode tentar o mesmo envio novamente.');
-    } finally { if (active.current && session.current === current) { running.current = false; setBusy(false); stream.current = null; } }
+    } finally { if (active.current && session.current === current) { running.current = false; notifyProcessing(); setBusy(false); stream.current = null; } }
   };
   const send = (e: React.FormEvent) => {
-    e.preventDefault(); if (!text.trim() || !ready || running.current || uploads.some(u => !u.response)) return;
+    e.preventDefault(); if (!text.trim() || !ready || running.current || uploadItems.current.some(u => !u.response)) return;
     const assistantId = crypto.randomUUID();
     const technical = messages.length ? '' : '\n\nDados do aplicativo (informados pelo navegador): ' + JSON.stringify({ application: appName || null, ...detectEnvironment() });
     const request = { assistantId, payload: { client_message_id: crypto.randomUUID(), text: text.trim().slice(0, 7000) + technical, context: recentContext(messages), attachment_ids: uploads.map(u => u.response!.attachment_id) } };
@@ -97,6 +124,7 @@ function ChatSession({ projectId, apiKey, apiUrl, appName, sessionUserRef, onCre
   const confirm = async () => {
     const current = session.current; if (!proposal || !current || running.current) return;
     running.current = true; setBusy(true); setError('');
+    notifyProcessing(); setStage('Enviando');
     try {
       const card = await client.confirmSupportProposal(current, { hash: proposal.hash, version: proposal.version });
       if (active.current && session.current === current) { setCreated(card); setProposal(null); onCreated(card); }
@@ -105,13 +133,17 @@ function ChatSession({ projectId, apiKey, apiUrl, appName, sessionUserRef, onCre
       if (e instanceof SnapsHttpError && [401, 403, 410].includes(e.status)) { expire(); return; }
       if (e instanceof SnapsHttpError && e.status === 409) { setProposal(null); setError('A proposta mudou. Envie uma mensagem para revisar antes de confirmar.'); }
       else setError('Não foi possível confirmar. Tente novamente; a confirmação não duplica o chamado.');
-    } finally { if (active.current && session.current === current) { running.current = false; setBusy(false); } }
+    } finally { if (active.current && session.current === current) { running.current = false; notifyProcessing(); setBusy(false); } }
   };
   return <section aria-label="Chat de suporte" className="snaps-chat space-y-4 border rounded-xl p-4">
     <h2 className="text-lg font-bold">Converse com o suporte</h2>
     <p className="text-sm">Conte o que aconteceu ou sua ideia de melhoria. Vou reunir os dados do chamado e mostrar tudo para você revisar antes de enviar.</p>
     <p className="text-sm">Ao encerrar, esta conversa é apagada. O chamado confirmado permanece disponível na lista.</p>
     <div role="log" aria-label="Mensagens da conversa" aria-live="polite" className="space-y-3">{messages.map(m => <div key={m.id} className="rounded border p-3"><strong>{m.role === 'user' ? 'Você' : 'Suporte'}</strong><MarkdownRenderer content={m.content} />{m.attachments?.map(a => <img key={a.attachment_id} src={a.url} alt="Imagem enviada nesta conversa" className="max-w-full" width={200} />)}{m.incomplete && <span>Resposta incompleta</span>}</div>)}</div>
+    {(busy || uploads.some(u => u.loading)) && <div role="status" className="rounded border p-3 text-sm flex items-center gap-2">
+      <Loader2 aria-hidden="true" size={16} className="animate-spin" />
+      <span>{busy ? stage : 'Enviando imagens'}… Aguarde para enviar outra mensagem.</span>
+    </div>}
     {error && <p role="alert">{error}</p>}
     {expired && <p role="status">Conversa expirada. Inicie uma nova conversa para continuar.</p>}
     {!ready && !error && !expired && <p role="status">Iniciando conversa...</p>}
@@ -119,13 +151,24 @@ function ChatSession({ projectId, apiKey, apiUrl, appName, sessionUserRef, onCre
     {proposal && !created && <section aria-label="Proposta de chamado" className="border rounded p-4 space-y-3"><h3>{proposal.proposal.title}</h3><p>{proposal.proposal.card_type === 'bug' ? 'Relato de bug' : 'Sugestão de melhoria'}</p><TicketFields proposal={proposal} /><MarkdownRenderer content={proposal.proposal.description} /><p>Revise os campos. Para corrigir algum dado, envie uma mensagem antes de confirmar.</p><button type="button" className="snaps-button" disabled={busy} onClick={() => { void confirm(); }}>Confirmar criação</button></section>}
     {created && <p role="status">Chamado criado: {created.code || created.id} — {created.title}</p>}
     {ready && !created && <form onSubmit={send} className="space-y-3">
-      <label className="block">Mensagem<textarea aria-label="Mensagem" maxLength={7000} value={text} onChange={e => setText(e.target.value)} rows={3} className="w-full border rounded p-2" /></label>
+      <label className="block">Mensagem<textarea aria-label="Mensagem" maxLength={7000} value={text} disabled={busy}
+        onPaste={e => {
+          const files = Array.from(e.clipboardData.items).filter(item => item.kind === 'file').map(item => item.getAsFile()).filter((file): file is File => file !== null);
+          if (files.length) { e.preventDefault(); chooseImages(files); }
+        }}
+        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); send(e); } }}
+        onChange={e => setText(e.target.value)} rows={3} className="w-full border rounded p-2" /></label>
       <label className="block">Anexar imagens<input type="file" aria-label="Anexar imagens" multiple accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={e => { chooseImages(e.target.files); e.target.value = ''; }} /></label>
       <p className="text-sm">Até 4 imagens de 5 MiB. As imagens anexadas usam URLs públicas de evidência.</p>
       <ul>{uploads.map(u => <li key={u.id} className="flex items-center gap-2"><ImagePreview file={u.file} /><span>{u.file.name} {u.loading ? 'Enviando...' : u.error ? 'Falha no upload' : 'Pronta'}</span>{u.error && <button type="button" className="snaps-button" onClick={() => { void upload(u); }}>Tentar upload novamente</button>}<button type="button" disabled={busy || u.loading} onClick={() => setUploads(all => all.filter(x => x.id !== u.id))}>Remover {u.file.name}</button></li>)}</ul>
       <div className="flex gap-2"><button type="submit" className="snaps-button" disabled={busy || uploads.some(u => !u.response)}>Enviar</button>
-        {busy && <button type="button" className="snaps-button" onClick={() => { setProposal(null); pending.current = null; stream.current?.abort(); }}>Cancelar resposta</button>}
-        {!busy && pending.current && <button type="button" className="snaps-button" onClick={() => { if (pending.current) void run(pending.current); }}>Tentar envio novamente</button>}
+        {busy && stream.current && <button type="button" className="snaps-button" onClick={() => { setProposal(null); stream.current?.abort(); }}>Cancelar resposta</button>}
+        {!busy && pending.current && <button type="button" className="snaps-button" disabled={uploads.some(u => u.loading)} onClick={() => {
+          if (!pending.current || running.current || uploadControllers.current.size) return;
+          const previous = pending.current;
+          const request = previous.retryAsNew ? { ...previous, retryAsNew: false, payload: { ...previous.payload, client_message_id: crypto.randomUUID() } } : previous;
+          pending.current = request; void run(request);
+        }}>Tentar envio novamente</button>}
       </div>
     </form>}
   </section>;

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { SnapsPublicClient, SnapsSprint, SnapsCard, SprintStatus } from '../../api/snaps-client';
 import { SprintSection } from './SprintSection';
 import { Filter, ChevronDown } from 'lucide-react';
+import { BoardLoading } from '../shared/BoardLoading';
 
 export interface RoadmapBoardProps { projectId: string; apiKey: string; apiUrl?: string; showBacklog?: boolean; }
 type Page<T> = { items: T[]; offset: number; total: number; more: boolean; loading: boolean; error: boolean };
@@ -46,7 +47,7 @@ function usePages<T extends { id: string }>(client: SnapsPublicClient, selected:
 }
 function PageControls({ page, more, retry, name }: { page: Page<unknown>; more: () => void; retry: () => void; name: string }) {
   return <>
-    {page.loading && <p role="status">Carregando {name}...</p>}
+    {page.loading && <BoardLoading>Carregando {name}...</BoardLoading>}
     {page.error && <div role="alert">Não foi possível carregar {name}. <button type="button" className="snaps-button" onClick={retry}>Tentar novamente {name}</button></div>}
     {page.more && !page.error && <button type="button" className="snaps-button" disabled={page.loading} onClick={more}>Carregar mais {name}</button>}
   </>;
