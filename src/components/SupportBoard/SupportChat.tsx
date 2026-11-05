@@ -136,6 +136,7 @@ function ChatSession({ projectId, apiKey, apiUrl, appName, sessionUserRef, onCre
     } finally { if (active.current && session.current === current) { running.current = false; notifyProcessing(); setBusy(false); } }
   };
   return <section aria-label="Chat de suporte" className="snaps-chat space-y-4 border rounded-xl p-4">
+    <div className="snaps-chat-content space-y-4">
     <h2 className="text-lg font-bold">Converse com o suporte</h2>
     <p className="text-sm">Conte o que aconteceu ou sua ideia de melhoria. Vou reunir os dados do chamado e mostrar tudo para você revisar antes de enviar.</p>
     <p className="text-sm">Ao encerrar, esta conversa é apagada. O chamado confirmado permanece disponível na lista.</p>
@@ -150,6 +151,7 @@ function ChatSession({ projectId, apiKey, apiUrl, appName, sessionUserRef, onCre
     {(expired || (!ready && error) || created) && <button type="button" className="snaps-button" onClick={() => setEntry(v => v + 1)}>Nova conversa</button>}
     {proposal && !created && <section aria-label="Proposta de chamado" className="border rounded p-4 space-y-3"><h3>{proposal.proposal.title}</h3><p>{proposal.proposal.card_type === 'bug' ? 'Relato de bug' : 'Sugestão de melhoria'}</p><TicketFields proposal={proposal} /><MarkdownRenderer content={proposal.proposal.description} /><p>Revise os campos. Para corrigir algum dado, envie uma mensagem antes de confirmar.</p><button type="button" className="snaps-button" disabled={busy} onClick={() => { void confirm(); }}>Confirmar criação</button></section>}
     {created && <p role="status">Chamado criado: {created.code || created.id} — {created.title}</p>}
+    </div>
     {ready && !created && <form onSubmit={send} className="space-y-3">
       <label className="block">Mensagem<textarea aria-label="Mensagem" maxLength={7000} value={text} disabled={busy}
         onPaste={e => {
