@@ -99,3 +99,18 @@
 .snaps-ticket-fields { display: grid; gap: 12px; }
 .snaps-ticket-fields dt { font-size: 12px; font-weight: 600; color: var(--snaps-text-secondary); }
 .snaps-ticket-fields dd { font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Expanded support stays inside the existing Shadow DOM and keeps the composer visible. */
+.snaps-support-actions button:first-child { display: flex; align-items: center; gap: 6px; }
+.snaps-support-actions { display: flex; align-items: center; gap: 8px; }
+.snaps-support-panel-expanded { inset: 16px; width: auto; height: auto; z-index: 2147483647; }
+.snaps-support-panel-expanded .snaps-support-body { min-height: 0; overflow: hidden; }
+.snaps-support-panel-expanded .snaps-chat { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.snaps-support-panel-expanded .snaps-chat-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; }
+.snaps-support-panel-expanded .snaps-chat-content p, .snaps-support-panel-expanded .snaps-chat-content li { max-width: 72ch; }
+.snaps-support-panel-expanded .snaps-chat-content img { width: auto; max-width: 100%; height: auto; }
+.snaps-support-panel-expanded .snaps-chat-content [role="log"] img { width: min(100%, 720px); }
+.snaps-support-panel-expanded .snaps-chat > form { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+@media (max-width: 639px) {
+  .snaps-support-panel-expanded { inset: 0; width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
+}

@@ -69,8 +69,8 @@ it('loads standalone UMD, versions six Shadow DOM hosts and confirms an ephemera
   try {
     await page.locator('snaps-costs-board').getByRole('tab', { name: 'IA de suporte' }).click();
     await page.locator('snaps-costs-board').getByText('USD 0.00000000', { exact: true }).first().waitFor();
-    expect(await page.evaluate(() => { const api = (window as unknown as { SnapsClient: { version: string; registerAll: () => void } }).SnapsClient; api.registerAll(); api.registerAll(); return api.version; })).toBe('0.2.1');
-    expect(await page.locator('[data-snaps-version="0.2.1"]').count()).toBe(6);
+    expect(await page.evaluate(() => { const api = (window as unknown as { SnapsClient: { version: string; registerAll: () => void } }).SnapsClient; api.registerAll(); api.registerAll(); return api.version; })).toBe('0.2.2');
+    expect(await page.locator('[data-snaps-version="0.2.2"]').count()).toBe(6);
     expect(await page.evaluate(() => [...document.querySelectorAll('[data-snaps-version]')].every(h => Boolean(h.shadowRoot?.querySelector('style')?.textContent?.includes('--snaps-primary'))))).toBe(true);
     expect(await page.locator('snaps-costs-board').getByRole('button', { name: 'Aplicar período' }).evaluate(el => getComputedStyle(el).fontSize)).not.toBe('40px');
     const support = page.locator('snaps-support-board'); await support.getByRole('button', { name: 'Abrir suporte Snaps' }).click();
@@ -89,6 +89,29 @@ it('loads standalone UMD, versions six Shadow DOM hosts and confirms an ephemera
     await support.getByRole('button', { name: 'Encerrar conversa', exact: true }).click(); await support.getByRole('button', { name: 'Abrir suporte Snaps' }).click();
     expect(await support.getByText('Relato desta sessão', { exact: true }).count()).toBe(0);
     expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0); expect(errors).toEqual([]);
+  } finally { await context.close(); }
+});
+it('expands inside Shadow DOM at desktop and mobile sizes and restores its preference', async () => {
+  const { page, context, errors } = await host();
+  try {
+    const support = page.locator('snaps-support-board');
+    await support.getByRole('button', { name: 'Abrir suporte Snaps' }).click();
+    const toggle = support.getByRole('button', { name: 'Ampliar', exact: true });
+    await toggle.focus(); await toggle.click();
+    const panel = support.getByRole('dialog', { name: 'Suporte Snaps' });
+    expect(await panel.boundingBox()).toMatchObject({ x: 16, y: 16, width: 1248, height: 868 });
+    const restore = support.getByRole('button', { name: 'Restaurar', exact: true });
+    expect(await restore.getAttribute('aria-pressed')).toBe('true');
+    expect(await restore.evaluate(el => (el.getRootNode() as ShadowRoot).activeElement === el)).toBe(true);
+    await page.setViewportSize({ width: 375, height: 700 });
+    expect(await panel.boundingBox()).toMatchObject({ x: 0, y: 0, width: 375, height: 700 });
+    expect(await panel.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await page.keyboard.press('Escape'); expect(await panel.count()).toBe(0);
+    await support.getByRole('button', { name: 'Abrir suporte Snaps' }).click();
+    expect(await support.getByRole('button', { name: 'Restaurar' }).getAttribute('aria-pressed')).toBe('true');
+    await support.getByRole('button', { name: 'Restaurar' }).click();
+    expect(await support.getByRole('button', { name: 'Ampliar' }).getAttribute('aria-pressed')).toBe('false');
+    expect(errors).toEqual([]);
   } finally { await context.close(); }
 });
 it('downloads exact Markdown and creates an isolated real multipage A4 PDF', async () => {
