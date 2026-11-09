@@ -44,6 +44,7 @@ export function CardRow({ card, onClick }: CardRowProps) {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h4 className="text-sm font-semibold text-slate-800 truncate">{card.title}</h4>
+            {card.repo_name && <span className="text-xs text-slate-600 truncate">{card.repo_name}</span>}
             {card.code && (
               <span className="text-[10px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded font-mono font-medium shrink-0">
                 {card.code}
