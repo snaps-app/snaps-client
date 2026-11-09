@@ -3,7 +3,9 @@ import { BugReportForm } from '../BugReportForm';
 import { FeatureRequestForm } from '../FeatureRequestForm';
 import { X, Bug, Lightbulb } from 'lucide-react';
 
-export interface CreateCardModalProps {
+import type { RepositoryOptions } from './RepositoryField';
+
+export interface CreateCardModalProps extends RepositoryOptions {
   projectId: string;
   apiKey: string;
   apiUrl?: string;
@@ -19,6 +21,8 @@ export function CreateCardModal({
   apiKey,
   apiUrl,
   appName,
+  repositories,
+  defaultRepository,
   isOpen,
   onClose,
   onSuccess,
@@ -79,6 +83,8 @@ export function CreateCardModal({
                 apiKey={apiKey}
                 apiUrl={apiUrl}
                 appName={appName}
+                repositories={repositories}
+                defaultRepository={defaultRepository}
                 onSuccess={() => {
                   onSuccess();
                   onClose();
@@ -93,6 +99,8 @@ export function CreateCardModal({
                 apiKey={apiKey}
                 apiUrl={apiUrl}
                 appName={appName}
+                repositories={repositories}
+                defaultRepository={defaultRepository}
                 onSuccess={() => {
                   onSuccess();
                   onClose();

@@ -26,7 +26,7 @@ export function FloatingSupport(props: SupportChatProps) {
     {open && <div ref={panel} role="dialog" aria-modal="true" aria-label="Suporte Snaps" className={`snaps-support-panel${expanded ? ' snaps-support-panel-expanded' : ''}`} onKeyDown={e => {
       if (e.key === 'Escape') { e.preventDefault(); requestClose(); }
       if (e.key === 'Tab') {
-        const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), textarea:not(:disabled), input:not(:disabled), a[href], select')).filter(el => el.getClientRects().length > 0);
+        const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), textarea:not(:disabled), input:not(:disabled), a[href], select:not(:disabled)')).filter(el => el.getClientRects().length > 0);
         const first = controls[0], last = controls[controls.length - 1];
         if (e.shiftKey && e.target === first) { e.preventDefault(); last?.focus(); }
         else if (!e.shiftKey && e.target === last) { e.preventDefault(); first?.focus(); }

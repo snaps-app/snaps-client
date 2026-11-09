@@ -2,7 +2,7 @@ import type { CardMetadata } from './snaps-client';
 export interface SupportSession { chat_id: string; session_token: string; expires_at: string; }
 export interface RecentMessage { role: 'user' | 'assistant'; content: string; }
 export interface SupportMessage { client_message_id: string; text: string; context: RecentMessage[]; attachment_ids: string[]; }
-export interface SupportProposal { title: string; description: string; card_type: 'bug' | 'improvement'; attachment_ids: string[]; card_metadata?: CardMetadata; }
+export interface SupportProposal { repo_name?: string | null; title: string; description: string; card_type: 'bug' | 'improvement'; attachment_ids: string[]; card_metadata?: CardMetadata; }
 export type ProposalEvent = { type: 'proposal'; proposal: SupportProposal; hash: string; version: number };
 export type SupportEvent = { type: 'thinking' | 'tool_start' | 'tool_end' } | { type: 'token'; content: string } | { type: 'done'; incompleto: boolean } | { type: 'error'; message: string } | { type: 'guardrail_tripped'; message: string } | ProposalEvent;
 export interface AttachmentResponse { url: string; attachment_id: string; mime_type: string; size_bytes: number; }
@@ -16,7 +16,7 @@ export function recentContext(messages: RecentMessage[]): RecentMessage[] {
   }
   return result;
 }
-function publicEvent(value: unknown): SupportEvent | null {
+function publicEvent(value: unknown, includeRepository = false): SupportEvent | null {
   if (!value || typeof value !== 'object') return null;
   const v = value as Record<string, unknown>;
   if (v.type === 'thinking' || v.type === 'tool_start' || v.type === 'tool_end') return { type: v.type };
@@ -33,11 +33,20 @@ function publicEvent(value: unknown): SupportEvent | null {
         for (const key of ['application', 'module', 'actual_behavior', 'expected_behavior', 'steps_to_reproduce', 'severity', 'frequency', 'users_affected', 'workaround_description', 'problem_or_opportunity', 'proposed_solution', 'expected_impact', 'priority_justification', 'browser', 'os', 'screen_resolution', 'app_version']) if (typeof raw[key] === 'string') metadata[key] = (raw[key] as string).slice(0, 4000);
         for (const key of ['blocks_critical_flow', 'has_workaround']) if (typeof raw[key] === 'boolean') metadata[key] = raw[key] as boolean;
       }
-      return { type: 'proposal', hash: v.hash, version: Number(v.version), proposal: { title: p.title, description: p.description, card_type: p.card_type, attachment_ids: p.attachment_ids as string[], card_metadata: metadata } };
+      const repository = includeRepository && (p.repo_name === null || typeof p.repo_name === 'string')
+        ? { repo_name: p.repo_name }
+        : {};
+      return { type: 'proposal', hash: v.hash, version: Number(v.version), proposal: { title: p.title, description: p.description, card_type: p.card_type, attachment_ids: p.attachment_ids as string[], card_metadata: metadata, ...repository } };
     }
   }
   return null;
 }
+export function parseRepositoryProposal(value: unknown): ProposalEvent {
+  const event = publicEvent(value, true);
+  if (event?.type !== 'proposal') throw new Error('Revisão de suporte inválida.');
+  return event;
+}
+
 export async function readSupportEvents(stream: ReadableStream<Uint8Array>, receive: (event: SupportEvent) => void) {
   const reader = stream.getReader(); const decoder = new TextDecoder(); let buffer = ''; let doneSeen = false;
   const frame = (text: string) => {

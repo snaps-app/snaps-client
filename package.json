@@ -1,6 +1,6 @@
 {
   "name": "@snaps/client",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "type": "module",
   "main": "dist/snaps-client.umd.js",
   "module": "dist/snaps-client.es.js",

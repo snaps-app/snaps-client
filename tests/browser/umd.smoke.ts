@@ -38,6 +38,10 @@ async function host() {
   await context.route(imageUrl, route => route.fulfill({ contentType: 'image/png', body: png }));
   const requests: string[] = [];
   const sentMessages: Record<string, unknown>[] = [];
+  const repositoryRequests: Record<string, unknown>[] = [];
+  const createdCards: Record<string, unknown>[] = [];
+  const confirmations: Record<string, unknown>[] = [];
+  let selectedRepository: string | undefined;
   await context.route('**/public/projects/**', async route => {
     const req = route.request(); const path = new URL(req.url()).pathname; requests.push(path);
     expect(req.headers()['x-api-key']).toBe('fixture-key');
@@ -57,20 +61,35 @@ async function host() {
     else if (path.endsWith('/messages')) {
       sentMessages.push(req.postDataJSON());
       await route.fulfill({ contentType: 'text/event-stream', body: 'data: {"type":"token","content":"Resposta pública"}\n\ndata: {"type":"proposal","hash":"' + 'a'.repeat(64) + '","version":1,"proposal":{"title":"Proposta pública","description":"Revise antes de criar","card_type":"bug","attachment_ids":[]}}\n\ndata: {"type":"done","incompleto":false}\n\n' }); return;
-    } else if (path.endsWith('/confirm')) json = { ...card, title: 'Proposta pública' };
+    } else if (path.endsWith('/proposal/repository')) {
+      expect(req.headers()['x-support-session']).toBe('fixture-session');
+      const payload = req.postDataJSON();
+      repositoryRequests.push(payload);
+      selectedRepository = payload.repo_name;
+      json = { type: 'proposal', hash: 'b'.repeat(64), version: 2,
+        proposal: { title: 'Proposta pública', description: 'Revise antes de criar',
+          card_type: 'bug', attachment_ids: [], repo_name: selectedRepository } };
+    } else if (path.endsWith('/confirm')) {
+      confirmations.push(req.postDataJSON());
+      json = { ...card, title: 'Proposta pública', ...(selectedRepository ? { repo_name: selectedRepository } : {}) };
+    } else if (path.endsWith('/cards') && req.method() === 'POST') {
+      const payload = req.postDataJSON();
+      createdCards.push(payload);
+      json = { ...card, ...payload };
+    }
     else if (path.endsWith('/close')) { await route.fulfill({ status: 204 }); return; }
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify(json) });
   });
   await page.goto(origin);
-  return { page, context, errors, requests, sentMessages };
+  return { page, context, errors, requests, sentMessages, repositoryRequests, createdCards, confirmations };
 }
 it('loads standalone UMD, versions six Shadow DOM hosts and confirms an ephemeral support proposal', async () => {
-  const { page, context, errors, requests, sentMessages } = await host();
+  const { page, context, errors, requests, sentMessages, repositoryRequests, confirmations } = await host();
   try {
     await page.locator('snaps-costs-board').getByRole('tab', { name: 'IA de suporte' }).click();
     await page.locator('snaps-costs-board').getByText('USD 0.00000000', { exact: true }).first().waitFor();
-    expect(await page.evaluate(() => { const api = (window as unknown as { SnapsClient: { version: string; registerAll: () => void } }).SnapsClient; api.registerAll(); api.registerAll(); return api.version; })).toBe('0.2.2');
-    expect(await page.locator('[data-snaps-version="0.2.2"]').count()).toBe(6);
+    expect(await page.evaluate(() => { const api = (window as unknown as { SnapsClient: { version: string; registerAll: () => void } }).SnapsClient; api.registerAll(); api.registerAll(); return api.version; })).toBe('0.3.0');
+    expect(await page.locator('[data-snaps-version="0.3.0"]').count()).toBe(6);
     expect(await page.evaluate(() => [...document.querySelectorAll('[data-snaps-version]')].every(h => Boolean(h.shadowRoot?.querySelector('style')?.textContent?.includes('--snaps-primary'))))).toBe(true);
     expect(await page.locator('snaps-costs-board').getByRole('button', { name: 'Aplicar período' }).evaluate(el => getComputedStyle(el).fontSize)).not.toBe('40px');
     const support = page.locator('snaps-support-board'); await support.getByRole('button', { name: 'Abrir suporte Snaps' }).click();
@@ -85,6 +104,9 @@ it('loads standalone UMD, versions six Shadow DOM hosts and confirms an ephemera
     await support.getByRole('button', { name: 'Confirmar criação' }).waitFor(); expect(requests.filter(r => r.endsWith('/confirm')).length).toBe(0);
     await support.getByRole('button', { name: 'Confirmar criação' }).click(); await support.getByText(/Chamado criado:/).waitFor();
     expect(requests.filter(r => r.endsWith('/confirm')).length).toBe(1);
+    expect(repositoryRequests).toEqual([]);
+    expect(sentMessages[0]).not.toHaveProperty('repo_name');
+    expect(confirmations).toEqual([{ hash: 'a'.repeat(64), version: 1 }]);
     expect(sentMessages[0].attachment_ids).toEqual(['image-1']); expect(sentMessages[0].context).toEqual([]);
     await support.getByRole('button', { name: 'Encerrar conversa', exact: true }).click(); await support.getByRole('button', { name: 'Abrir suporte Snaps' }).click();
     expect(await support.getByText('Relato desta sessão', { exact: true }).count()).toBe(0);
@@ -140,3 +162,46 @@ it('downloads exact Markdown and creates an isolated real multipage A4 PDF', asy
   } finally { await context.close(); }
 });
 
+
+
+it('binds and removes host attributes and confirms only the reviewed repository in Shadow DOM', async () => {
+  const { page, context, errors, repositoryRequests, createdCards, confirmations } = await host();
+  try {
+    const support = page.locator('snaps-support-board');
+    await support.evaluate(host => {
+      host.setAttribute('repositories', 'App, Site, app');
+      host.setAttribute('default-repository', 'SITE');
+    });
+    await support.getByRole('button', { name: 'Novo Bug' }).click();
+    const repository = support.getByRole('combobox', { name: 'Repositório' });
+    await repository.waitFor();
+    expect(await repository.inputValue()).toBe('Site');
+
+    await support.evaluate(host => host.removeAttribute('default-repository'));
+
+    await expect.poll(() => repository.inputValue(), { timeout: 3000 }).toBe('');
+    expect(await support.getByRole('button', { name: 'Reportar Bug', exact: true }).last().isEnabled()).toBe(false);
+
+    await support.evaluate(host => host.removeAttribute('repositories'));
+    await repository.waitFor({ state: 'detached' });
+    const textFields = support.locator('form input[type=text], form textarea');
+    for (const field of await textFields.all()) await field.fill('Relato sem seleção');
+    await support.getByRole('button', { name: 'Reportar Bug', exact: true }).last().click();
+    await page.waitForFunction(() => !document.querySelector('snaps-support-board')?.shadowRoot?.querySelector('form'));
+    expect(createdCards).toHaveLength(1);
+    expect(createdCards[0]).not.toHaveProperty('repo_name');
+
+    await support.evaluate(host => host.setAttribute('repositories', 'App, Site'));
+    await support.getByRole('button', { name: 'Abrir suporte Snaps' }).click();
+    await repository.selectOption('Site');
+    await support.getByLabel('Mensagem', { exact: true }).fill('Relato com seleção');
+    await support.getByRole('button', { name: 'Enviar', exact: true }).click();
+    const review = support.getByRole('region', { name: 'Proposta de chamado' });
+    await review.getByText('Site', { exact: true }).waitFor();
+    await review.getByRole('button', { name: 'Confirmar criação' }).click();
+    await support.getByText(/Chamado criado:/).waitFor();
+    expect(repositoryRequests).toEqual([{ repo_name: 'Site', hash: 'a'.repeat(64), version: 1 }]);
+    expect(confirmations).toEqual([{ hash: 'b'.repeat(64), version: 2 }]);
+    expect(errors).toEqual([]);
+  } finally { await context.close(); }
+});
