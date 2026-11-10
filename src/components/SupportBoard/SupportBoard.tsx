@@ -8,7 +8,9 @@ import { SearchInput, Pagination, toast } from '../shared';
 import { AlertCircle, Bug, Lightbulb, Plus, RefreshCw } from 'lucide-react';
 import { BoardLoading } from '../shared/BoardLoading';
 
-export interface SupportBoardProps {
+import type { RepositoryOptions } from './RepositoryField';
+
+export interface SupportBoardProps extends RepositoryOptions {
   sessionUserRef?: string;
   sessionKey?: string;
   projectId: string;
@@ -31,6 +33,8 @@ function SupportView({
   appName,
   sessionUserRef,
   sessionKey,
+  repositories,
+  defaultRepository,
 }: SupportBoardProps) {
   const [activeTab, setActiveTab] = useState<'active' | 'history'>(defaultTab);
   const requestGeneration = useRef(0);
@@ -163,7 +167,7 @@ function SupportView({
 
   return (
     <div className="space-y-6 w-full mx-auto">
-      <FloatingSupport projectId={projectId} apiKey={apiKey} apiUrl={apiUrl} appName={appName} sessionUserRef={sessionUserRef} sessionKey={sessionKey} onCreated={() => { fetchTickets(activeTab); }} />
+      <FloatingSupport projectId={projectId} apiKey={apiKey} apiUrl={apiUrl} appName={appName} sessionUserRef={sessionUserRef} sessionKey={sessionKey} repositories={repositories} defaultRepository={defaultRepository} onCreated={() => { fetchTickets(activeTab); }} />
       {/* Header controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border shadow-sm">
         <div className="flex gap-2">
@@ -323,6 +327,8 @@ function SupportView({
         apiKey={apiKey}
         apiUrl={apiUrl}
         appName={appName}
+        repositories={repositories}
+        defaultRepository={defaultRepository}
         isOpen={isCreateOpen}
         defaultTab={createDefaultTab}
         onClose={() => setIsCreateOpen(false)}

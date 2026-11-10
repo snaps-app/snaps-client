@@ -15,6 +15,7 @@ export function CardDetailModal({ card, projectId, apiKey, apiUrl, onClose, onRe
   return <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-40">
     <section role="dialog" aria-modal="true" aria-label={current.title} className="bg-white rounded-xl max-w-3xl w-full shadow-2xl border max-h-[90vh] overflow-y-auto p-5 space-y-4">
       <header className="flex justify-between gap-3"><h2 className="text-xl font-bold">{current.title}</h2><button type="button" className="snaps-button" onClick={onClose} aria-label="Fechar chamado">Fechar</button></header>
+      {current.repo_name && <p className="text-sm">Repositório: <strong>{current.repo_name}</strong></p>}
       <div className="flex gap-2"><span>{current.code}</span><StatusPill status={current.status} />{current.card_type === 'bug' && <SeverityBadge severity={current.card_metadata?.severity} />}</div>
       {editing ? <Form projectId={projectId} apiKey={apiKey} apiUrl={apiUrl} initialValues={current}
         onEditSubmit={payload => new SnapsPublicClient({ projectId, apiKey, apiUrl }).updateSupportCard(current.id, payload)}

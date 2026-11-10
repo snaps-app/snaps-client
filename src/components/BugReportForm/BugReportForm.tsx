@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { SnapsPublicClient } from '../../api/snaps-client';
+import { SnapsHttpError, SnapsPublicClient } from '../../api/snaps-client';
 import { detectEnvironment } from './EnvironmentDetector';
 import { FileUploadZone, toast, ToastContainer } from '../shared';
 import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { SupportEditForm, SupportEditFormProps } from '../SupportBoard/SupportEditForm';
 
-export interface BugReportFormProps {
+import { RepositoryField, RepositoryOptions, repositoryUnavailable, useRepositorySelection } from '../SupportBoard/RepositoryField';
+
+export interface BugReportFormProps extends RepositoryOptions {
   initialValues?: SupportEditFormProps['initialValues'];
   onEditSubmit?: SupportEditFormProps['onEditSubmit'];
   projectId: string;
@@ -26,9 +28,15 @@ function CreateBugReportForm({
   apiUrl,
   appVersion,
   appName,
+  repositories,
+  defaultRepository,
   onSuccess,
   onCancel,
 }: BugReportFormProps) {
+  const repository = useRepositorySelection(repositories, defaultRepository);
+  const [repositoryError, setRepositoryError] = useState('');
+  const needsRepository = repository.options.length > 0 && !repository.value;
+
   // Form State
   const [title, setTitle] = useState('');
   const [application, setApplication] = useState(appName || '');
@@ -85,6 +93,8 @@ function CreateBugReportForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (needsRepository || isSubmitting) return;
+    setRepositoryError('');
     if (!validate()) {
       toast.error('Erro de validação', 'Por favor, preencha todos os campos obrigatórios.');
       return;
@@ -144,6 +154,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}
       // 4. Create Card
       const payload = {
         title,
+        ...(repository.value ? { repo_name: repository.value } : {}),
         card_type: 'bug',
         status: 'New Issues',
         priority: severityToPriority(severity),
@@ -185,6 +196,10 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}
         onSuccess(card);
       }
     } catch (err: any) {
+      if (repository.value && err instanceof SnapsHttpError && err.status === 422) {
+        setRepositoryError(repositoryUnavailable);
+        return;
+      }
       toast.error('Erro ao reportar', err.message || 'Houve um problema ao criar o ticket.');
       console.error(err);
     } finally {
@@ -201,6 +216,8 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        <RepositoryField selection={repository} disabled={isSubmitting} onChange={() => setRepositoryError('')} />
+        {repository.options.length > 0 && repositoryError && <p role="alert">{repositoryError}</p>}
         {/* Seção 1: Identificação */}
         <div className="bg-slate-50 p-4 rounded-lg space-y-4">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">1. Identificação</h3>
@@ -441,7 +458,7 @@ ${attachmentMarkdown || 'Nenhum anexo enviado.'}
           )}
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || needsRepository}
             className="px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors disabled:opacity-70 flex items-center gap-2"
           >
             {isSubmitting ? (

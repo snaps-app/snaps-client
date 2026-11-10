@@ -1,4 +1,4 @@
-import { AttachmentResponse, readSupportEvents, SupportEvent, SupportMessage, SupportSession } from './support-chat';
+import { AttachmentResponse, parseRepositoryProposal, ProposalEvent, readSupportEvents, SupportEvent, SupportMessage, SupportSession } from './support-chat';
 import { CostPeriod, HoursOptions, HoursResponse, LlmCostsResponse } from './costs';
 export * from './support-chat';
 export * from './costs';
@@ -33,6 +33,7 @@ export interface CardMetadata {
 }
 
 export interface SnapsCard {
+  repo_name?: string | null;
   editable?: boolean;
   edit_reason?: string | null;
   id: string;
@@ -149,6 +150,15 @@ export class SnapsPublicClient {
   async createSupportSession(sessionUserRef?: string): Promise<SupportSession> { return (await this.supportRequest('', { session_user_ref: sessionUserRef || null })).json(); }
   async closeSupportSession(session: SupportSession): Promise<void> { await this.supportRequest(`/${encodeURIComponent(session.chat_id)}/close`, {}, session, undefined, true); }
   async confirmSupportProposal(session: SupportSession, proposal: { hash: string; version: number }): Promise<SnapsCard> { return (await this.supportRequest(`/${encodeURIComponent(session.chat_id)}/confirm`, proposal, session)).json(); }
+  async reviseSupportRepository(
+    session: SupportSession,
+    payload: { repo_name: string; hash: string; version: number } | { recover: true },
+    signal: AbortSignal,
+  ): Promise<ProposalEvent> {
+    const path = `/${encodeURIComponent(session.chat_id)}/proposal/repository`;
+    const response = await this.supportRequest(path, payload, session, signal);
+    return parseRepositoryProposal(await response.json());
+  }
   async sendSupportMessage(session: SupportSession, payload: SupportMessage, receive: (event: SupportEvent) => void, signal?: AbortSignal): Promise<void> {
     const res = await this.supportRequest(`/${encodeURIComponent(session.chat_id)}/messages`, payload, session, signal);
     if (!res.headers.get('Content-Type')?.toLowerCase().includes('text/event-stream') || !res.body) throw new Error('Resposta de suporte inválida.');
@@ -186,6 +196,7 @@ export class SnapsPublicClient {
 
   async createSupportCard(payload: {
     title: string;
+    repo_name?: string;
     description?: string;
     card_type?: string;
     priority?: string;
@@ -200,6 +211,7 @@ export class SnapsPublicClient {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
+      if (res.status === 422 && payload.repo_name !== undefined) throw new SnapsHttpError(res.status);
       throw new Error(`SnapsPublicClient.createSupportCard: HTTP ${res.status}`);
     }
     return res.json();

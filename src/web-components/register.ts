@@ -28,10 +28,25 @@ const wcSupportBoard = r2wc(withShadowStyles(SupportBoard), {
     defaultTab: 'string',
     sessionUserRef: 'string',
     sessionKey: 'string',
+    repositories: 'string',
+    defaultRepository: 'string',
     pageSize: 'number',
     appName: 'string',
   },
 });
+
+class SupportBoardElement extends wcSupportBoard {
+  attributeChangedCallback(name: string, previous: string | null, value: string | null) {
+    // R2WC ignores an empty value. Whitespace reaches its string parser and
+    // is treated as absent by the shared repository selector.
+    const repositoryAttribute = name === 'repositories' || name === 'default-repository';
+    const parsedValue = repositoryAttribute && !value ? ' ' : value;
+    const base = wcSupportBoard.prototype as HTMLElement & {
+      attributeChangedCallback: SupportBoardElement['attributeChangedCallback'];
+    };
+    base.attributeChangedCallback.call(this, name, previous, parsedValue);
+  }
+}
 
 const wcRoadmapBoard = r2wc(withShadowStyles(RoadmapBoard), {
   shadow: 'open',
@@ -79,7 +94,7 @@ export function registerAll() {
   if (typeof window !== 'undefined' && window.customElements) {
     if (!window.customElements.get('snaps-costs-board')) window.customElements.define('snaps-costs-board', versioned(wcCostsBoard));
     if (!window.customElements.get('snaps-support-board')) {
-      window.customElements.define('snaps-support-board', versioned(wcSupportBoard));
+      window.customElements.define('snaps-support-board', versioned(SupportBoardElement));
     }
     if (!window.customElements.get('snaps-roadmap-board')) {
       window.customElements.define('snaps-roadmap-board', versioned(wcRoadmapBoard));
